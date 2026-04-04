@@ -1348,8 +1348,10 @@ const TeacherDashboard = () => {
                                         animate={{ opacity: 1 }}
                                         transition={{ delay: idx * 0.03 }}
                                     >
-                                        <td className="font-semibold text-main">{student.name}</td>
-                                        <td>
+                                        <td className="student-name-field" data-label="Student Name">
+                                            <div className="font-semibold text-main">{student.name}</div>
+                                        </td>
+                                        <td data-label="Roll Identity">
                                             <div className="roll-pill">{student.rollNumber}</div>
                                             {(() => {
                                                 const activeSub = teacherSubjects.find(sub => sub._id === selectedSubjectId);
@@ -1367,7 +1369,7 @@ const TeacherDashboard = () => {
                                                 return null;
                                             })()}
                                         </td>
-                                        <td>
+                                        <td data-label="Current Status">
                                             <div className="status-indicator">
                                                 <span className={`status-dot ${attendance[student._id]?.toLowerCase()}`}></span>
                                                 <span className={`badge badge-${attendance[student._id]?.toLowerCase()}`}>
@@ -1375,10 +1377,10 @@ const TeacherDashboard = () => {
                                                 </span>
                                             </div>
                                         </td>
-                                        <td className="font-semibold text-dim">{student.department}</td>
-                                        <td className="font-semibold text-dim">Sem {student.semester}</td>
+                                        <td data-label="Department" className="font-semibold text-dim">{student.department}</td>
+                                        <td data-label="Semester" className="font-semibold text-dim">Sem {student.semester}</td>
 
-                                        <td>
+                                        <td className="actions-field" data-label="Mark Attendance">
                                             <div className="action-buttons">
                                                 <button 
                                                     className={`action-btn p ${attendance[student._id] === 'Present' ? 'active' : ''}`}
@@ -2103,10 +2105,120 @@ const TeacherDashboard = () => {
                     animation: spin 0.8s linear infinite;
                 }
                 
-                @media (max-width: 768px) {
+                @media (max-width: 1024px) {
                     .dashboard-header { flex-direction: column; align-items: flex-start; gap: 1rem; }
                     .table-header { flex-direction: column; align-items: stretch; }
                     .search-box { max-width: 100%; }
+                }
+
+                /* --- MOBILE-SPECIFIC MASTER OPTIMIZATIONS (Only for small screens) --- */
+                @media (max-width: 768px) {
+                    .teacher-dashboard { padding-bottom: 5rem; } /* Space for bottom nav */
+                    
+                    /* 1. Bottom App Navigation */
+                    .dashboard-nav {
+                        position: fixed;
+                        bottom: 0; left: 0; right: 0;
+                        width: 100%!important;
+                        margin-bottom: 0;
+                        border-radius: 0;
+                        padding: 0.75rem 1rem;
+                        background: rgba(255, 255, 255, 0.95);
+                        backdrop-filter: blur(20px);
+                        border-top: 1px solid var(--border);
+                        justify-content: space-around;
+                        z-index: 1000;
+                        box-shadow: 0 -5px 25px rgba(0,0,0,0.08);
+                    }
+                    
+                    .nav-tab {
+                        flex-direction: column;
+                        gap: 0.25rem;
+                        padding: 0.5rem;
+                        font-size: 0.7rem;
+                        background: transparent!important;
+                        box-shadow: none!important;
+                        width: auto;
+                    }
+                    
+                    .nav-tab svg { width: 22px; height: 22px; }
+                    .nav-tab.active { color: var(--primary); }
+                    
+                    /* 2. Stats Grid Optimization (2x2) */
+                    .stats-grid { grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-bottom: 1.5rem; }
+                    .stat-card { padding: 1rem; border-radius: 1.25rem; }
+                    .stat-icon { width: 38px; height: 38px; border-radius: 1rem; }
+                    .stat-icon svg { width: 18px; height: 18px; }
+                    .stat-content h3 { font-size: 1.25rem; }
+                    .stat-content p { font-size: 0.6rem; }
+                    
+                    /* 3. Date Picker & Subject Select on Mobile */
+                    .header-actions { width: 100%; }
+                    .date-picker { width: 100%; justify-content: space-between; border-radius: 1rem; margin-top: 0.5rem; }
+                    .dashboard-header h1 { font-size: 1.65rem; }
+                    
+                    /* 4. Table to Data-Cards Transformation (CRITICAL) */
+                    .light-table, .light-table thead, .light-table tbody, .light-table th, .light-table td, .light-table tr { 
+                        display: block; 
+                    }
+                    
+                    .light-table thead { display: none; } /* Hide traditional headers */
+                    .light-table tr {
+                        background: white;
+                        border: 1px solid var(--border);
+                        border-radius: 1.25rem;
+                        margin-bottom: 1rem;
+                        padding: 1.25rem;
+                        box-shadow: var(--shadow-sm);
+                        position: relative;
+                        overflow: hidden;
+                    }
+                    
+                    .light-table td {
+                        padding: 0.5rem 0!important;
+                        border: none!important;
+                        display: flex;
+                        justify-content: space-between;
+                        align-items: center;
+                        text-align: right;
+                        border-bottom: 1px dashed rgba(15, 23, 42, 0.03)!important;
+                    }
+                    
+                    .light-table td::before {
+                        content: attr(data-label);
+                        font-weight: 800;
+                        font-size: 0.75rem;
+                        color: var(--text-dim);
+                        text-transform: uppercase;
+                        text-align: left;
+                    }
+                    
+                    /* Adjust specific mobile data fields */
+                    .light-table td.student-name-field {
+                        display: block;
+                        text-align: left;
+                        border-bottom: 1.5px solid rgba(15, 23, 42, 0.05)!important;
+                        padding-bottom: 1rem!important;
+                        margin-bottom: 0.5rem;
+                    }
+                    .light-table td.student-name-field::before { display: block; margin-bottom: 0.25rem; }
+                    .light-table td.student-name-field .font-semibold { font-size: 1.1rem; }
+                    
+                    .light-table td.actions-field {
+                        background: rgba(15, 23, 42, 0.02);
+                        margin: 0.75rem -1.25rem -1.25rem;
+                        padding: 1rem 1.25rem!important;
+                        justify-content: center;
+                        gap: 1.5rem;
+                        border-top: 1px solid var(--border)!important;
+                    }
+                    .light-table td.actions-field::before { display: none; }
+                    
+                    .action-buttons { gap: 1rem; scale: 1.1; }
+                    
+                    /* Modals on Mobile */
+                    .modal-content { width: 95%!important; margin: 0 1rem; padding: 1.5rem!important; max-height: 90vh; overflow-y: auto; }
+                    .form-row { grid-template-columns: 1fr; gap: 0; }
                 }
             `}} />
         </motion.div>

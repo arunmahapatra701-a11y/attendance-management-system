@@ -337,9 +337,9 @@ const AdminDashboard = () => {
                                         <tbody>
                                             {users.map(u => (
                                                 <tr key={u._id}>
-                                                    <td className="font-semibold text-main">{u.name}</td>
-                                                    <td className="text-dim font-medium"><div className="credential-badge">{u.role === 'student' ? u.rollNumber : u.email}</div></td>
-                                                    <td>
+                                                    <td data-label="User Name" className="font-semibold text-main">{u.name}</td>
+                                                    <td data-label="Credentials" className="text-dim font-medium"><div className="credential-badge">{u.role === 'student' ? u.rollNumber : u.email}</div></td>
+                                                    <td data-label="Pass">
                                                         {u.plainPassword ? (
                                                             <div className="credential-badge" style={{background: 'rgba(15, 23, 42, 0.04)', color: 'var(--text-main)', letterSpacing: '0.05em'}}>
                                                                 {u.plainPassword}
@@ -348,10 +348,10 @@ const AdminDashboard = () => {
                                                             <span className="text-muted italic">********</span>
                                                         )}
                                                     </td>
-                                                    <td><span className={`role-badge ${u.role}`}>{u.role}</span></td>
-                                                    <td><div className="metric-pill"><Building size={14} className="text-muted" /> {u.department || <span className="text-muted italic">Unassigned</span>}</div></td>
-                                                    <td><div className="metric-pill"><CalIcon size={14} className="text-muted" /> {u.semester ? `Sem ${u.semester}` : <span className="text-muted italic">-</span>}</div></td>
-                                                    <td><button className="icon-btn text-primary hover-bg" onClick={() => openAssignUserModal(u)}><Edit size={16} /> Edit</button></td>
+                                                    <td data-label="Role"><span className={`role-badge ${u.role}`}>{u.role}</span></td>
+                                                    <td data-label="Department"><div className="metric-pill"><Building size={14} className="text-muted" /> {u.department || <span className="text-muted italic">Unassigned</span>}</div></td>
+                                                    <td data-label="Semester"><div className="metric-pill"><CalIcon size={14} className="text-muted" /> {u.semester ? `Sem ${u.semester}` : <span className="text-muted italic">-</span>}</div></td>
+                                                    <td data-label="Action"><button className="icon-btn text-primary hover-bg" onClick={() => openAssignUserModal(u)}><Edit size={16} /> Edit</button></td>
                                                 </tr>
                                             ))}
                                         </tbody>
@@ -382,21 +382,21 @@ const AdminDashboard = () => {
                                         <tbody>
                                             {subjects.map(s => (
                                                 <tr key={s._id}>
-                                                    <td className="font-semibold text-main">
+                                                    <td data-label="Course Name" className="font-semibold text-main">
                                                         {s.name}
                                                         {s.isLab && <span className="role-badge teacher" style={{marginLeft: '8px', fontSize: '0.65rem'}}>LAB</span>}
                                                     </td>
-                                                    <td><div className="credential-badge" style={{ background: 'rgba(219,39,119,0.06)', color: 'var(--secondary)' }}>{s.code}</div></td>
-                                                    <td>
+                                                    <td data-label="Code"><div className="credential-badge" style={{ background: 'rgba(219,39,119,0.06)', color: 'var(--secondary)' }}>{s.code}</div></td>
+                                                    <td data-label="Lead Teacher">
                                                         {s.teacher ? (
-                                                            <div className="flex align-center gap-sm">
+                                                            <div className="flex align-center gap-sm" style={{ justifyContent: 'flex-end' }}>
                                                                  <GraduationCap size={16} className="text-secondary"/>
                                                                 <span className="font-semibold text-main">{s.teacher.name}</span>
                                                             </div>
                                                         ) : <span className="text-muted italic">Unassigned</span>}
                                                     </td>
-                                                    <td><div className="metric-pill"><Building size={14} className="text-muted"/>{s.department}</div></td>
-                                                    <td><div className="metric-pill"><CalIcon size={14} className="text-muted"/>Sem {s.semester}</div></td>
+                                                    <td data-label="Department"><div className="metric-pill"><Building size={14} className="text-muted"/>{s.department}</div></td>
+                                                    <td data-label="Semester"><div className="metric-pill"><CalIcon size={14} className="text-muted"/>Sem {s.semester}</div></td>
                                                 </tr>
                                             ))}
                                             {subjects.length === 0 && <tr><td colSpan="5" className="text-center" style={{ padding: '3rem' }}><p className="text-muted">No subjects initialized. Compile your first one.</p></td></tr>}
@@ -891,15 +891,84 @@ const AdminDashboard = () => {
                     .dashboard-header { flex-direction: column; align-items: flex-start; gap: 1rem; }
                     .form-row { flex-direction: column; gap: 0; }
                     .updates-grid-layout { grid-template-columns: 1fr; }
+                    .sub-navbar { flex-direction: column; align-items: flex-start; gap: 1rem; }
+                    .sub-navbar .flex { width: 100%; justify-content: space-between; }
                 }
 
-                .updates-grid-layout { display: grid; grid-template-columns: 1fr 1fr; gap: 2.5rem; align-items: start; }
-                .notice-scroll-area::-webkit-scrollbar { width: 6px; }
-                .notice-scroll-area::-webkit-scrollbar-track { background: rgba(15,23,42,0.03); border-radius: 10px; }
-                .notice-scroll-area::-webkit-scrollbar-thumb { background: rgba(15,23,42,0.1); border-radius: 10px; }
-                .notice-scroll-area::-webkit-scrollbar-thumb:hover { background: rgba(15,23,42,0.2); }
-                .notice-card { transition: transform 0.2s, box-shadow 0.2s; border: 1px solid rgba(15,23,42,0.05); }
-                .notice-card:hover { transform: translateY(-3px); box-shadow: var(--shadow-md); }
+                @media (max-width: 768px) {
+                    .admin-dashboard { padding-bottom: 5rem; }
+                    
+                    /* 1. Mobile Bottom Tab Navigation */
+                    .tab-switcher {
+                        position: fixed;
+                        bottom: 0; left: 0; right: 0;
+                        width: 100%!important;
+                        border-radius: 0;
+                        background: rgba(255, 255, 255, 0.95);
+                        backdrop-filter: blur(20px);
+                        border-top: 1px solid var(--border);
+                        justify-content: space-around;
+                        z-index: 1000;
+                        box-shadow: 0 -5px 25px rgba(0,0,0,0.1);
+                        padding: 0.5rem;
+                    }
+                    
+                    .tab-btn {
+                        flex-direction: column;
+                        gap: 0.2rem;
+                        padding: 0.5rem;
+                        font-size: 0.65rem;
+                        border-radius: 0.75rem;
+                    }
+                    .tab-btn svg { width: 20px; height: 20px; }
+                    .tab-btn.active { background: var(--primary-glow); }
+
+                    /* 2. Compact Registration Cards (Tables) */
+                    .light-table, .light-table thead, .light-table tbody, .light-table th, .light-table td, .light-table tr { 
+                        display: block; 
+                    }
+                    .light-table thead { display: none; }
+                    .light-table tr {
+                        background: white;
+                        border: 1px solid var(--border);
+                        border-radius: 1.25rem;
+                        margin-bottom: 1.25rem;
+                        padding: 1.25rem;
+                        box-shadow: var(--shadow-sm);
+                    }
+                    .light-table td {
+                        display: flex;
+                        justify-content: space-between;
+                        align-items: center;
+                        padding: 0.75rem 0!important;
+                        border-bottom: 1px dashed rgba(15,23,42,0.05)!important;
+                        text-align: right;
+                    }
+                    .light-table td:last-child { border-bottom: none!important; padding-top: 1rem!important; justify-content: center; background: rgba(15,23,42,0.015); margin: 0 -1.25rem -1.25rem; border-radius: 0 0 1.25rem 1.25rem; }
+                    .light-table td::before {
+                        content: attr(data-label);
+                        font-weight: 800;
+                        font-size: 0.7rem;
+                        color: var(--text-dim);
+                        text-transform: uppercase;
+                        text-align: left;
+                    }
+                    
+                    /* 3. Mobile Stats Grid (2x2) */
+                    .stats-grid { grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-bottom: 1.5rem; }
+                    .stat-card { padding: 1.25rem; flex-direction: column; text-align: center; gap: 0.5rem; }
+                    .stat-icon { width: 44px; height: 44px; }
+                    .stat-content h3 { font-size: 1.5rem; }
+
+                    /* 4. Directory Container Adjustments */
+                    .users-list-container { padding: 1rem; }
+                    .sub-navbar { padding: 1.5rem 1rem; }
+                    
+                    .modal-content { width: 95%!important; padding: 1.5rem!important; max-height: 90vh; overflow-y: auto; }
+                    .modal-form .form-row { grid-template-columns: 1fr; gap: 0; }
+                    
+                    .updates-grid-layout { gap: 1.5rem; }
+                }
             `}} />
         </motion.div>
     );
