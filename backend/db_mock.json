@@ -1,0 +1,36 @@
+{
+  "users": [
+    {
+      "id": "1",
+      "name": "Demo Admin",
+      "email": "admin@test.com",
+      "password": "123456",
+      "role": "admin"
+    },
+    {
+      "id": "2",
+      "name": "Demo Teacher",
+      "email": "teacher@test.com",
+      "password": "123456",
+      "role": "teacher",
+      "subject": "Computer Science"
+    },
+    {
+      "id": "3",
+      "name": "John Student",
+      "email": "john@test.com",
+      "password": "123456",
+      "role": "student",
+      "rollNumber": "ST-001"
+    },
+    {
+      "id": "4",
+      "name": "Jane Student",
+      "email": "jane@test.com",
+      "password": "123456",
+      "role": "student",
+      "rollNumber": "ST-002"
+    }
+  ],
+  "attendance": []
+}
