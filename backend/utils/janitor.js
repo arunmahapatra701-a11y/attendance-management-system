@@ -7,7 +7,7 @@ const Attendance = require('../models/Attendance');
  */
 const runMonthlyCleanup = async () => {
     try {
-        console.log('[JANITOR] Starting automatic monthly optimization...');
+        console.log('[JANITOR] Starting automatic monthly optimization (Bucket Mode)...');
         
         const ONE_MONTH_AGO = new Date();
         ONE_MONTH_AGO.setMonth(ONE_MONTH_AGO.getMonth() - 1);
@@ -41,13 +41,17 @@ const runMonthlyCleanup = async () => {
         if (oldDataAggregated.length > 0) {
             const archiveCollection = mongoose.connection.db.collection('attendance_archives');
             
+            // LIGHTNING PERFORMANCE: Keep indexing for archives
+            await archiveCollection.createIndex({ student: 1, month: -1 });
+            await archiveCollection.createIndex({ teacher: 1, month: -1 });
+
             const bucketsToInsert = oldDataAggregated.map(bucket => ({
                 student: bucket._id.student,
                 subject: bucket._id.subject,
                 teacher: bucket._id.teacher,
                 section: bucket._id.section,
                 month: bucket._id.month,
-                records: bucket.days,
+                records: bucket.days, // Standard JSON objects (Easier to manage)
                 stats: {
                     present: bucket.presentCount,
                     absent: bucket.absentCount,
@@ -74,16 +78,18 @@ const runMonthlyCleanup = async () => {
 
 // Start the scheduler
 const initJanitor = () => {
-    console.log('[JANITOR] Database Janitor Service Initialized (Monthly Schedule)');
+    console.log('[JANITOR] Database Janitor Service Initialized (Monthly Bucket Mode)');
     
+    // Auto-run once on boot for safety
+    runMonthlyCleanup();
+
     // Check once every 24 hours
     setInterval(() => {
         const now = new Date();
-        // Run on the 1st of every month at midnight
         if (now.getDate() === 1 && now.getHours() === 0) {
             runMonthlyCleanup();
         }
-    }, 1000 * 60 * 60); // Check hourly to catch midnight
+    }, 1000 * 60 * 60);
 };
 
 module.exports = { initJanitor, runMonthlyCleanup };

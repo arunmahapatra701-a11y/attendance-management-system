@@ -1,23 +1,12 @@
 const express = require('express');
 const router = express.Router();
 const multer = require('multer');
-const { getAllUsers, assignUser, createUser, getUserStats } = require('../controllers/userController');
+const { getAllUsers, assignUser, createUser, getUserStats, getTeachers } = require('../controllers/userController');
 const { bulkImportStudents } = require('../controllers/bulkImportController');
 const { protect, authorize } = require('../middleware/auth');
 
-// Use memory storage so we get the file buffer directly
-const upload = multer({ 
-    storage: multer.memoryStorage(),
-    fileFilter: (req, file, cb) => {
-        if (file.originalname.match(/\.(xlsx|xls|csv)$/i)) {
-            cb(null, true);
-        } else {
-            cb(new Error('Only Excel files (.xlsx, .xls) or CSV are allowed'), false);
-        }
-    },
-    limits: { fileSize: 5 * 1024 * 1024 } // 5MB max
-});
-
+// This route is used heavily in the Admin Dashboard for assigning teachers to subjects.
+router.get('/teachers', protect, authorize('admin'), getTeachers);
 router.get('/', protect, authorize('admin'), getAllUsers);
 router.get('/stats', protect, authorize('admin'), getUserStats);
 router.get('/test-route', (req, res) => res.json({ message: 'User routes are working' }));

@@ -2,7 +2,9 @@ const User = require('../models/User');
 
 const getAllUsers = async (req, res) => {
     try {
-        const users = await User.find({ role: { $ne: 'admin' } }).select('-password');
+        const users = await User.find({ role: { $ne: 'admin' } })
+            .select('-password')
+            .lean();
         res.json(users);
     } catch (error) {
         res.status(500).json({ message: 'Failed to fetch users', error: error.message });
@@ -92,18 +94,31 @@ const createUser = async (req, res) => {
 
 const getUserStats = async (req, res) => {
     try {
-        const users = await User.find({ role: { $ne: 'admin' } });
-        const totalStudents = users.filter(u => u.role === 'student').length;
-        const totalTeachers = users.filter(u => u.role === 'teacher').length;
+        // LIGHTNING PERFORMANCE: Use database counts instead of fetching all users
+        const [totalStudents, totalTeachers, totalSubjects] = await Promise.all([
+            User.countDocuments({ role: 'student' }),
+            User.countDocuments({ role: 'teacher' }),
+            require('../models/Subject').countDocuments({})
+        ]);
+        
         res.json({
             totalStudents,
             totalTeachers,
-            totalClasses: 0, // Will be updated when subjects are counted
-            systemHealth: 'Optimal - Real-time monitoring'
+            totalClasses: totalSubjects,
+            systemHealth: 'Optimal'
         });
     } catch (error) {
         res.status(500).json({ message: 'Failed to fetch stats', error: error.message });
     }
 };
 
-module.exports = { getAllUsers, assignUser, createUser, getUserStats };
+const getTeachers = async (req, res) => {
+    try {
+        const teachers = await User.find({ role: 'teacher' }).select('name department').lean();
+        res.json(teachers);
+    } catch (error) {
+        res.status(500).json({ message: 'Failed to fetch teachers', error: error.message });
+    }
+};
+
+module.exports = { getAllUsers, assignUser, createUser, getUserStats, getTeachers };

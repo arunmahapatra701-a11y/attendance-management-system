@@ -3,6 +3,7 @@ const Attendance = require('../models/Attendance');
 const Subject = require('../models/Subject');
 const Material = require('../models/Material');
 const Notice = require('../models/Notice');
+const { runMonthlyCleanup } = require('../utils/janitor');
 
 const clearDatabase = async (req, res) => {
     try {
@@ -32,4 +33,17 @@ const clearDatabase = async (req, res) => {
     }
 };
 
-module.exports = { clearDatabase };
+const optimizeDatabase = async (req, res) => {
+    try {
+        await runMonthlyCleanup(); // Triggers the Janitor logic immediately
+        res.status(200).json({ 
+            success: true, 
+            message: 'Database optimization complete. Standard records older than 1 month have been bucketed.' 
+        });
+    } catch (error) {
+        console.error('Manual optimization error:', error);
+        res.status(500).json({ success: false, message: 'Optimization failed', error: error.message });
+    }
+};
+
+module.exports = { clearDatabase, optimizeDatabase };

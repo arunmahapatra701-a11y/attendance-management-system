@@ -185,8 +185,11 @@ const TeacherDashboard = () => {
         const matchesSearch = s.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                               (s.rollNumber && s.rollNumber.toLowerCase().includes(searchTerm.toLowerCase()));
                               
-        const matchesDept = attFilter.departments.length === 0 || attFilter.departments.includes(s.department);
-        const matchesSem = attFilter.semesters.length === 0 || attFilter.semesters.includes(s.semester);
+        const matchesDept = attFilter.departments.length === 0 || 
+                           attFilter.departments.some(d => String(d).toLowerCase() === String(s.department).toLowerCase());
+        
+        const matchesSem = attFilter.semesters.length === 0 || 
+                           attFilter.semesters.some(sem => String(sem) === String(s.semester));
         
         let matchesBatch = true;
         const activeSub = teacherSubjects.find(sub => sub._id === selectedSubjectId);
@@ -1005,7 +1008,7 @@ const TeacherDashboard = () => {
                                         className="filter-dropdown glass-card"
                                     >
                                         <div className="filter-section">
-                                            <h4>Report & Log Filtering</h4>
+                                            <h4>{view === 'attendance' ? 'Attendance Filtering' : 'Report & Log Filtering'}</h4>
                                             
                                             <div className="filter-group">
                                                 <p className="filter-label">Departments Mode</p>
@@ -1016,8 +1019,12 @@ const TeacherDashboard = () => {
                                                                 type="checkbox" 
                                                                 checked={attFilter.departments.includes(dept)}
                                                                 onChange={(e) => {
-                                                                    if (e.target.checked) setAttFilter({...attFilter, departments: [...attFilter.departments, dept]});
-                                                                    else setAttFilter({...attFilter, departments: attFilter.departments.filter(d => d !== dept)});
+                                                                    // Update departments immediately
+                                                                    const updatedDepts = e.target.checked 
+                                                                        ? [...attFilter.departments, dept]
+                                                                        : attFilter.departments.filter(d => d !== dept);
+                                                                    
+                                                                    setAttFilter({...attFilter, departments: updatedDepts});
                                                                 }}
                                                             />
                                                             <span>{dept}</span>

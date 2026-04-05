@@ -81,28 +81,18 @@ const AdminDashboard = () => {
         setIsLoading(true);
         try {
             if (view === 'overview') {
-                const [usersData, subsData] = await Promise.all([
-                    axios.get('/api/users'),
-                    axios.get('/api/subjects')
-                ]);
-                const stds = usersData.data.filter(u => u.role === 'student').length;
-                const tchs = usersData.data.filter(u => u.role === 'teacher').length;
-                setStats({ 
-                    totalStudents: stds, 
-                    totalTeachers: tchs, 
-                    totalClasses: subsData.data.length, 
-                    systemHealth: 'Optimal - Real-time monitoring' 
-                });
+                const { data } = await axios.get('/api/users/stats');
+                setStats(data);
             } else if (view === 'users') {
                 const { data } = await axios.get('/api/users');
                 setUsers(data);
             } else if (view === 'subjects') {
-                const [subsData, usersData] = await Promise.all([
+                const [subsData, teachersData] = await Promise.all([
                     axios.get('/api/subjects'),
-                    axios.get('/api/users')
+                    axios.get('/api/users/teachers')
                 ]);
                 setSubjects(subsData.data);
-                setUsers(usersData.data); // Needed for teacher dropdown
+                setUsers(teachersData.data); // Actually just teachers for the dropdown
             } else if (view === 'materials') {
                 const { data } = await axios.get('/api/materials');
                 setMaterials(data.materials);
@@ -568,6 +558,42 @@ const AdminDashboard = () => {
                                 <div className="nav-icon"><ShieldCheck size={24} className="text-secondary"/></div>
                                 <div><h2 className="sub-nav-title">System & Database Settings</h2><p className="sub-nav-subtitle">Manage persistence and critical system data</p></div>
                             </div>
+                        </div>
+
+                        <div className="glass-card" style={{ padding: '2rem', maxWidth: '750px', borderTop: '4px solid var(--primary)', marginBottom: '2rem' }}>
+                            <div style={{ marginBottom: '2rem' }}>
+                                <h3 className="text-main" style={{ fontSize: '1.25rem', fontWeight: 800, marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                    <Activity size={18} style={{ color: 'var(--primary)' }} /> Automated Optimization (Database Janitor)
+                                </h3>
+                                <p style={{ color: 'var(--text-dim)', fontSize: '0.95rem', lineHeight: '1.6' }}>
+                                    Your system normally runs this automatically on the 1st of every month. You can manually trigger it now to:
+                                </p>
+                                <ul style={{ marginTop: '1rem', color: 'var(--text-dim)', fontSize: '0.9rem', display: 'flex', flexDirection: 'column', gap: '0.5rem', listStyle: 'none', paddingLeft: 0 }}>
+                                    <li>📦 Compress attendance logs older than 1 month into storage buckets.</li>
+                                    <li>⚡ Sync database indexes for maximum retrieval performance.</li>
+                                    <li>🧼 Clean up orphaned session data and temporary records.</li>
+                                </ul>
+                            </div>
+
+                            <button 
+                                type="button" 
+                                className="btn-primary" 
+                                disabled={isProcessing}
+                                onClick={async () => {
+                                    setIsProcessing(true);
+                                    try {
+                                        const { data } = await axios.post('/api/admin/optimize-database');
+                                        alert(data.message);
+                                    } catch (error) {
+                                        alert('Optimization failed: ' + (error.response?.data?.message || error.message));
+                                    } finally {
+                                        setIsProcessing(false);
+                                    }
+                                }}
+                                style={{ padding: '1rem 2rem', background: 'var(--primary)', color: 'white', border: 'none', borderRadius: '1rem', cursor: 'pointer', fontWeight: 800, fontSize: '1rem', width: '100%', boxShadow: '0 4px 15px rgba(59, 130, 246, 0.2)' }}
+                            >
+                                {isProcessing ? 'Optimizing Architecture...' : 'RUN MANUAL DATABASE OPTIMIZATION'}
+                            </button>
                         </div>
 
                         <div className="glass-card" style={{ padding: '2rem', maxWidth: '750px', borderTop: '4px solid #ef4444' }}>

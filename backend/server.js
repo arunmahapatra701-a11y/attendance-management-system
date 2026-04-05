@@ -7,9 +7,16 @@ const path = require('path');
 // Load environment variables
 dotenv.config();
 
+const compression = require('compression');
+const morgan = require('morgan');
+
 const app = express();
 
-// Middleware
+// LIGHTNING PERFORMANCE: Use Gzip compression for all JSON responses
+app.use(compression());
+// MONITORING: Log API request speeds to detect slowdowns
+app.use(morgan('dev'));
+
 app.use(cors());
 app.use(express.json());
 

@@ -13,6 +13,7 @@ const StudentDashboard = () => {
     const { user } = useAuth();
     const location = useLocation();
     const [attendance, setAttendance] = useState([]);
+    const [summaryStats, setSummaryStats] = useState({ Present: 0, Absent: 0, Late: 0, total: 0 });
     const [isLoading, setIsLoading] = useState(true);
     const [view, setView] = useState(location.state?.view || 'overview');
     
@@ -41,7 +42,8 @@ const StudentDashboard = () => {
         const fetchAttendance = async () => {
             try {
                 const { data } = await axios.get('/api/attendance/student');
-                setAttendance(data);
+                setAttendance(data.records || []);
+                setSummaryStats(data.stats || { Present: 0, Absent: 0, Late: 0, total: 0 });
             } catch (err) {
                 console.error(err);
             } finally {
@@ -50,6 +52,15 @@ const StudentDashboard = () => {
         };
         fetchAttendance();
     }, []);
+
+    const stats = {
+        present: summaryStats.Present,
+        absent: summaryStats.Absent,
+        late: summaryStats.Late,
+        total: summaryStats.total
+    };
+
+    const percentage = stats.total > 0 ? Math.round((stats.present / stats.total) * 100) : 0;
 
     const fetchMaterials = async () => {
         setIsMaterialsLoading(true);
@@ -95,15 +106,6 @@ const StudentDashboard = () => {
     const handleSearchSubmit = (e) => {
         if (e.key === 'Enter') fetchMaterials();
     };
-
-    const stats = {
-        present: attendance.filter(a => a.status === 'Present').length,
-        absent: attendance.filter(a => a.status === 'Absent').length,
-        late: attendance.filter(a => a.status === 'Late').length,
-        total: attendance.length
-    };
-
-    const percentage = stats.total > 0 ? Math.round((stats.present / stats.total) * 100) : 0;
 
     const chartData = {
         labels: ['Present', 'Absent', 'Late'],
