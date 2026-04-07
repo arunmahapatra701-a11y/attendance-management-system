@@ -46,12 +46,15 @@ const TeacherDashboard = () => {
     // Filter System States
     const [showFilters, setShowFilters] = useState(false);
     const [attFilter, setAttFilter] = useState({ departments: [], semesters: [], remember: false });
+    const [draftFilter, setDraftFilter] = useState({ departments: [], semesters: [], remember: false });
     const [qaFilter, setQaFilter] = useState({ departments: [], semesters: [], digitsIds: {} });
     const [showQuickSubject, setShowQuickSubject] = useState(false);
+    const [draftSubjectId, setDraftSubjectId] = useState('');
     
     // Refs for outside click handling
     const subjectDropdownRef = React.useRef(null);
-    const filtersDropdownRef = React.useRef(null);
+    const attFiltersRef = React.useRef(null);
+    const logFiltersRef = React.useRef(null);
 
     // Auto-close dropdowns on outside click
     useEffect(() => {
@@ -59,7 +62,10 @@ const TeacherDashboard = () => {
             if (subjectDropdownRef.current && !subjectDropdownRef.current.contains(event.target)) {
                 setShowQuickSubject(false);
             }
-            if (filtersDropdownRef.current && !filtersDropdownRef.current.contains(event.target)) {
+            if (attFiltersRef.current && !attFiltersRef.current.contains(event.target)) {
+                setShowFilters(false);
+            }
+            if (logFiltersRef.current && !logFiltersRef.current.contains(event.target)) {
                 setShowFilters(false);
             }
         };
@@ -532,12 +538,16 @@ const TeacherDashboard = () => {
         <div className="filter-wrapper" style={{ position: 'relative' }} ref={subjectDropdownRef}>
             <button 
                 className={`filter-btn ${showQuickSubject ? 'active' : ''}`}
-                onClick={() => { setShowQuickSubject(!showQuickSubject); setShowFilters(false); }}
-                style={{ height: '42px', color: 'var(--text-main)', border: '1px solid var(--border)' }}
+                onClick={() => {
+                    if (!showQuickSubject) setDraftSubjectId(selectedSubjectId);
+                    setShowQuickSubject(!showQuickSubject);
+                    setShowFilters(false);
+                }}
             >
-                <BookOpen size={16} />
+                <BookOpen size={18} />
                 <span>Subject</span>
             </button>
+            
             <AnimatePresence>
                 {showQuickSubject && (
                     <motion.div 
@@ -547,33 +557,37 @@ const TeacherDashboard = () => {
                         className="filter-dropdown glass-card"
                         style={{ position: 'absolute', top: 'calc(100% + 12px)', right: 0, width: '280px', zIndex: 110, padding: '1.25rem' }}
                     >
-                        <div className="filter-section" style={{ marginBottom: 0 }}>
-                            <h4 style={{ marginBottom: '1rem', fontSize: '0.9rem', color: 'var(--text-main)', fontWeight: 800 }}>Quick Subject Select</h4>
-                            <div className="filter-group" style={{ marginBottom: 0 }}>
-                                <select 
-                                    className="input-field" 
-                                    style={{ width: '100%', height: '42px', backgroundColor: 'white', paddingRight: '2.5rem', appearance: 'auto', fontWeight: '600' }}
-                                    value={selectedSubjectId}
-                                    onChange={(e) => {
-                                        setSelectedSubjectId(e.target.value);
-                                        setShowQuickSubject(false);
-                                    }}
-                                >
-                                    <option value="">-- Choose Subject --</option>
-                                    {teacherSubjects.map(ts => (
-                                        <option key={ts._id} value={ts._id}>{ts.name} ({ts.code})</option>
-                                    ))}
-                                </select>
-                            </div>
-                            <label className="checkbox-label remember-check" style={{ marginTop: '0.75rem', padding: '0.5rem', fontSize: '0.8rem' }}>
-                                <input 
-                                    type="checkbox" 
-                                    checked={attFilter.remember}
-                                    onChange={(e) => setAttFilter({...attFilter, remember: e.target.checked})}
-                                />
-                                <span>Remember my setting</span>
-                            </label>
-                        </div>
+                        <p className="filter-label" style={{ marginBottom: '0.75rem', fontWeight: '800' }}>Quick Subject Select</p>
+                        <select 
+                            className="input-field"
+                            style={{ width: '100%', marginBottom: '1rem', backgroundColor: 'white' }}
+                            value={draftSubjectId}
+                            onChange={(e) => setDraftSubjectId(e.target.value)}
+                        >
+                            <option value="">-- Choose Subject --</option>
+                            {teacherSubjects.map(ts => (
+                                <option key={ts._id} value={ts._id}>{ts.name} ({ts.code})</option>
+                            ))}
+                        </select>
+                        <button 
+                            className="btn-primary" 
+                            style={{ width: '100%', padding: '0.75rem', fontWeight: '700' }}
+                            onClick={() => {
+                                setSelectedSubjectId(draftSubjectId);
+                                setShowQuickSubject(false);
+                                toast.success('Subject switched successfully');
+                            }}
+                        >
+                            Apply Selection
+                        </button>
+                        <label className="checkbox-label remember-check" style={{ marginTop: '0.75rem', padding: '0.5rem', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                            <input 
+                                type="checkbox" 
+                                checked={draftFilter.remember}
+                                onChange={(e) => setDraftFilter({...draftFilter, remember: e.target.checked})}
+                            />
+                            <span>Remember my setting</span>
+                        </label>
                     </motion.div>
                 )}
             </AnimatePresence>
@@ -679,7 +693,7 @@ const TeacherDashboard = () => {
                         )}
                         {renderMonthDropdown()}
                         {renderQuickSubjectMenu()}
-                        <div className="filter-wrapper" style={{ position: 'relative' }} ref={filtersDropdownRef}>
+                        <div className="filter-wrapper" style={{ position: 'relative' }} ref={logFiltersRef}>
                             <button 
                                 className={`filter-btn ${showFilters ? 'active' : ''}`}
                                 onClick={() => { 
@@ -732,12 +746,12 @@ const TeacherDashboard = () => {
                                                         <label key={sem} className="checkbox-label">
                                                             <input 
                                                                 type="checkbox" 
-                                                                checked={attFilter.semesters.includes(sem)}
+                                                                checked={draftFilter.semesters.includes(sem)}
                                                                 onChange={(e) => {
                                                                     const updatedSems = e.target.checked 
-                                                                        ? [...attFilter.semesters, sem]
-                                                                        : attFilter.semesters.filter(s => s !== sem);
-                                                                    setAttFilter({...attFilter, semesters: updatedSems});
+                                                                        ? [...draftFilter.semesters, sem]
+                                                                        : draftFilter.semesters.filter(s => s !== sem);
+                                                                    setDraftFilter({...draftFilter, semesters: updatedSems});
                                                                 }}
                                                             />
                                                             <span>Sem {sem}</span>
@@ -745,6 +759,47 @@ const TeacherDashboard = () => {
                                                     ))}
                                                 </div>
                                             </div>
+
+                                            <div className="filter-group">
+                                                <p className="filter-label">Select Department(s)</p>
+                                                <div className="checkbox-grid">
+                                                    {availableDepartments.map(dept => (
+                                                        <label key={dept} className="checkbox-label">
+                                                            <input 
+                                                                type="checkbox" 
+                                                                checked={draftFilter.departments.includes(dept)}
+                                                                onChange={(e) => {
+                                                                    const updatedDepts = e.target.checked 
+                                                                        ? [...draftFilter.departments, dept]
+                                                                        : draftFilter.departments.filter(d => d !== dept);
+                                                                    setDraftFilter({...draftFilter, departments: updatedDepts});
+                                                                }}
+                                                            />
+                                                            <span>{dept}</span>
+                                                        </label>
+                                                    ))}
+                                                </div>
+                                            </div>
+
+                                            <button 
+                                                className="btn-primary" 
+                                                style={{ width: '100%', marginTop: '1rem', marginBottom: '1rem', padding: '0.8rem', borderRadius: '0.75rem', fontWeight: '700', fontSize: '0.9rem' }}
+                                                onClick={() => {
+                                                    setAttFilter({...draftFilter});
+                                                    toast.success('Filters applied successfully');
+                                                }}
+                                            >
+                                                Apply Selected Filters
+                                            </button>
+
+                                            <label className="checkbox-label remember-check">
+                                                <input 
+                                                    type="checkbox" 
+                                                    checked={draftFilter.remember}
+                                                    onChange={(e) => setDraftFilter({...draftFilter, remember: e.target.checked})}
+                                                />
+                                                <span>Remember my settings</span>
+                                            </label>
 
                                             <div className="filter-group">
                                                 <p className="filter-label">Subject Type</p>
@@ -1008,11 +1063,14 @@ const TeacherDashboard = () => {
                         )}
                         {(view === 'reports' || view === 'log') && renderMonthDropdown()}
                         {renderQuickSubjectMenu()}
-                        <div className="filter-wrapper" style={{ position: 'relative' }}>
+                        <div className="filter-wrapper" style={{ position: 'relative' }} ref={attFiltersRef}>
 
                             <button 
                                 className={`filter-btn ${showFilters ? 'active' : ''}`}
-                                onClick={() => setShowFilters(!showFilters)}
+                                onClick={() => {
+                                    if (!showFilters) setDraftFilter({...attFilter});
+                                    setShowFilters(!showFilters);
+                                }}
                             >
                                 <Filter size={18} />
                                 <span>Options</span>
@@ -1075,12 +1133,12 @@ const TeacherDashboard = () => {
                                                         <label key={sem} className="checkbox-label">
                                                             <input 
                                                                 type="checkbox" 
-                                                                checked={attFilter.semesters.includes(sem)}
+                                                                checked={draftFilter.semesters.includes(sem)}
                                                                 onChange={(e) => {
                                                                     const updatedSems = e.target.checked 
-                                                                        ? [...attFilter.semesters, sem]
-                                                                        : attFilter.semesters.filter(s => s !== sem);
-                                                                    setAttFilter({...attFilter, semesters: updatedSems});
+                                                                        ? [...draftFilter.semesters, sem]
+                                                                        : draftFilter.semesters.filter(s => s !== sem);
+                                                                    setDraftFilter({...draftFilter, semesters: updatedSems});
                                                                 }}
                                                             />
                                                             <span>Sem {sem}</span>
@@ -1096,12 +1154,12 @@ const TeacherDashboard = () => {
                                                         <label key={dept} className="checkbox-label">
                                                             <input 
                                                                 type="checkbox" 
-                                                                checked={attFilter.departments.includes(dept)}
+                                                                checked={draftFilter.departments.includes(dept)}
                                                                 onChange={(e) => {
                                                                     const updatedDepts = e.target.checked 
-                                                                        ? [...attFilter.departments, dept]
-                                                                        : attFilter.departments.filter(d => d !== dept);
-                                                                    setAttFilter({...attFilter, departments: updatedDepts});
+                                                                        ? [...draftFilter.departments, dept]
+                                                                        : draftFilter.departments.filter(d => d !== dept);
+                                                                    setDraftFilter({...draftFilter, departments: updatedDepts});
                                                                 }}
                                                             />
                                                             <span>{dept}</span>
@@ -1130,16 +1188,25 @@ const TeacherDashboard = () => {
                                                             </label>
                                                         ))}
                                                     </div>
-                                                    <p style={{ fontSize: '0.65rem', color: 'var(--text-dim)', marginTop: '0.5rem', fontStyle: 'italic' }}>* Filter students by enrollment ranges</p>
                                                 </div>
                                             )}
 
+                                            <button 
+                                                className="btn-primary" 
+                                                style={{ width: '100%', marginTop: '1rem', marginBottom: '1rem', padding: '0.8rem', borderRadius: '0.75rem', fontWeight: '700', fontSize: '0.9rem' }}
+                                                onClick={() => {
+                                                    setAttFilter({...draftFilter});
+                                                    toast.success('Filters applied successfully');
+                                                }}
+                                            >
+                                                Apply Selected Filters
+                                            </button>
 
                                             <label className="checkbox-label remember-check">
                                                 <input 
                                                     type="checkbox" 
-                                                    checked={attFilter.remember}
-                                                    onChange={(e) => setAttFilter({...attFilter, remember: e.target.checked})}
+                                                    checked={draftFilter.remember}
+                                                    onChange={(e) => setDraftFilter({...draftFilter, remember: e.target.checked})}
                                                 />
                                                 <span>Remember my settings</span>
                                             </label>
@@ -1827,6 +1894,9 @@ const TeacherDashboard = () => {
                 </motion.div>
             )}
             </AnimatePresence>
+            
+            {/* Layout Spacer for Dropdown Visibility */}
+            <div className="layout-footer-spacer" style={{ height: '350px' }}></div>
 
             <style dangerouslySetInnerHTML={{ __html: `
                 .teacher-dashboard {
