@@ -114,7 +114,7 @@ const getUserStats = async (req, res) => {
 
 const getTeachers = async (req, res) => {
     try {
-        const teachers = await User.find({ role: 'teacher' }).select('name department').lean();
+        const teachers = await User.find({ role: 'teacher' }).select('name department role').lean();
         res.json(teachers);
     } catch (error) {
         res.status(500).json({ message: 'Failed to fetch teachers', error: error.message });
