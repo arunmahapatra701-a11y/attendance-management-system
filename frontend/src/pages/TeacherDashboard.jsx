@@ -20,6 +20,8 @@ const TeacherDashboard = () => {
     const [selectedBatches, setSelectedBatches] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [hasExistingRecords, setHasExistingRecords] = useState(false);
+    const [isOverwriting, setIsOverwriting] = useState(false);
     const [selectedSubjectType, setSelectedSubjectType] = useState('All');
 
     
@@ -148,11 +150,16 @@ const TeacherDashboard = () => {
                 
                 const existing = await axios.get(existingUrl);
                 if (existing.data.length > 0) {
+                    setHasExistingRecords(true);
+                    setIsOverwriting(false);
                     const existingMap = {};
                     existing.data.forEach(record => {
                         existingMap[record.student._id] = record.status;
                     });
                     setAttendance(prev => ({ ...prev, ...existingMap }));
+                } else {
+                    setHasExistingRecords(false);
+                    setIsOverwriting(true); // Allow marking if no records exist
                 }
 
                 // Fetch Logs if we enter log view
@@ -899,6 +906,14 @@ const TeacherDashboard = () => {
                             </AnimatePresence>
                         </div>
                         <button 
+                            className="btn-primary" 
+                            onClick={handleSubmit} 
+                            disabled={isSubmitting || (hasExistingRecords && !isOverwriting)}
+                            style={{ gap: '0.6rem', display: 'flex', alignItems: 'center', height: '42px', padding: '0 1.2rem', boxShadow: '0 4px 15px rgba(59, 130, 246, 0.25)', fontWeight: '600', letterSpacing: '0.01em' }}
+                        >
+                            {isSubmitting ? <span className="spinner"></span> : <><Send size={18} /> {hasExistingRecords ? 'Overwrite Records' : 'Save Records'}</>}
+                        </button>
+                        <button 
                             className="btn-primary export-excel-btn" 
                             onClick={downloadExcelReport}
                             style={{ gap: '0.6rem', display: 'flex', alignItems: 'center', height: '42px', padding: '0 1.2rem', boxShadow: '0 4px 15px rgba(59, 130, 246, 0.25)', fontWeight: '600', letterSpacing: '0.01em' }}
@@ -1056,6 +1071,22 @@ const TeacherDashboard = () => {
                     </div>
                     
                     <div className="action-cluster" style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+                        {hasExistingRecords && !isOverwriting && (
+                            <div className="warning-pill flex align-center gap-1" style={{ padding: '0.4rem 1rem', background: '#fff7ed', border: '1px solid #ffedd5', borderRadius: '1rem', color: '#9a3412', fontWeight: '700', fontSize: '0.85rem' }}>
+                                <AlertCircle size={16} />
+                                <span>Attendance already marked for this lecture.</span>
+                                <button 
+                                    className="btn-primary" 
+                                    style={{ padding: '0.2rem 0.6rem', fontSize: '0.75rem', marginLeft: '0.5rem' }}
+                                    onClick={() => {
+                                        setIsOverwriting(true);
+                                        toast.info('Overwriting mode enabled');
+                                    }}
+                                >
+                                    Continue
+                                </button>
+                            </div>
+                        )}
                         {selectedSubjectId && (view === 'reports' || view === 'attendance' || view === 'log') && (
                             <div className="metric-pill" style={{ color: 'var(--primary)', background: 'var(--primary-light)', fontWeight: '700', padding: '0.5rem 1rem' }}>
                                 {teacherSubjects.find(s => s._id === selectedSubjectId)?.name || 'Subject'}
