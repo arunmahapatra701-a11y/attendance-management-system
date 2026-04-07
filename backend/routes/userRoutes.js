@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const multer = require('multer');
+const upload = multer({ storage: multer.memoryStorage() });
 const { getAllUsers, assignUser, createUser, getUserStats, getTeachers } = require('../controllers/userController');
 const { bulkImportStudents } = require('../controllers/bulkImportController');
 const { protect, authorize } = require('../middleware/auth');
