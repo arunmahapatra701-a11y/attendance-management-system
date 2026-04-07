@@ -24,6 +24,11 @@ app.use(express.json());
 const frontendPath = path.join(__dirname, '../frontend/dist');
 app.use(express.static(frontendPath));
 
+// KEEP-ALIVE: Route for UptimeRobot to ping and keep the server awake
+app.get('/api/status', (req, res) => {
+    res.status(200).json({ status: 'active', message: 'Server is awake' });
+});
+
 // Routes
 app.use('/api/auth', require('./routes/authRoutes'));
 app.use('/api/attendance', require('./routes/attendanceRoutes'));
