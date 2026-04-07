@@ -22,6 +22,7 @@ const TeacherDashboard = () => {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [hasExistingRecords, setHasExistingRecords] = useState(false);
     const [isOverwriting, setIsOverwriting] = useState(false);
+    const [showDuplicateModal, setShowDuplicateModal] = useState(false);
     const [selectedSubjectType, setSelectedSubjectType] = useState('All');
 
     
@@ -152,6 +153,7 @@ const TeacherDashboard = () => {
                 if (existing.data.length > 0) {
                     setHasExistingRecords(true);
                     setIsOverwriting(false);
+                    setShowDuplicateModal(true); // Trigger pop-up
                     const existingMap = {};
                     existing.data.forEach(record => {
                         existingMap[record.student._id] = record.status;
@@ -160,6 +162,7 @@ const TeacherDashboard = () => {
                 } else {
                     setHasExistingRecords(false);
                     setIsOverwriting(true); // Allow marking if no records exist
+                    setShowDuplicateModal(false);
                 }
 
                 // Fetch Logs if we enter log view
@@ -1139,8 +1142,8 @@ const TeacherDashboard = () => {
                                                 <p className="filter-label">Subject Selection</p>
                                                 <select 
                                                     className="quick-select-inline"
-                                                    value={selectedSubjectId}
-                                                    onChange={(e) => setSelectedSubjectId(e.target.value)}
+                                                    value={draftSubjectId}
+                                                    onChange={(e) => setDraftSubjectId(e.target.value)}
                                                 >
                                                     <option value="">-- Choose Subject --</option>
                                                     {teacherSubjects
@@ -1226,7 +1229,9 @@ const TeacherDashboard = () => {
                                                 className="btn-primary" 
                                                 style={{ width: '100%', marginTop: '1rem', marginBottom: '1rem', padding: '0.8rem', borderRadius: '0.75rem', fontWeight: '700', fontSize: '0.9rem' }}
                                                 onClick={() => {
+                                                    setSelectedSubjectId(draftSubjectId);
                                                     setAttFilter({...draftFilter});
+                                                    setShowFilters(false);
                                                     toast.success('Filters applied successfully');
                                                 }}
                                             >
@@ -1924,6 +1929,56 @@ const TeacherDashboard = () => {
                     </div>
                 </motion.div>
             )}
+            </AnimatePresence>
+            
+            {/* Duplicate Attendance Modal */}
+            <AnimatePresence>
+                {showDuplicateModal && (
+                    <motion.div 
+                        initial={{ opacity: 0 }} 
+                        animate={{ opacity: 1 }} 
+                        exit={{ opacity: 0 }} 
+                        className="modal-overlay flex-center"
+                        style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(15, 23, 42, 0.4)', backdropFilter: 'blur(4px)', zIndex: 10000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}
+                        onClick={() => setShowDuplicateModal(false)}
+                    >
+                        <motion.div 
+                            initial={{ scale: 0.9, y: 20 }} 
+                            animate={{ scale: 1, y: 0 }} 
+                            className="glass-card"
+                            style={{ background: 'white', padding: '2rem', borderRadius: '1.5rem', width: '100%', maxWidth: '400px', textAlign: 'center', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.3)', position: 'relative' }}
+                            onClick={(e) => e.stopPropagation()} // Prevent closing when clicking inside
+                        >
+                            <div className="warning-icon-bg" style={{ width: '64px', height: '64px', background: '#fff7ed', borderRadius: '50%', margin: '0 auto 1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#f97316' }}>
+                                <AlertCircle size={32} />
+                            </div>
+                            <h3 className="text-main font-bold mb-1" style={{ fontSize: '1.25rem' }}>Duplicate Attendance</h3>
+                            <p className="text-dim mb-2" style={{ fontSize: '0.95rem', lineHeight: '1.5', fontWeight: '500' }}>
+                                Already attendance is marked for this lecture. Please select a different lecture or overwrite the existing data.
+                            </p>
+                            <div className="flex gap-1 mt-2">
+                                <button 
+                                    className="btn-secondary" 
+                                    style={{ flex: 1, padding: '0.75rem', borderRadius: '0.75rem', fontWeight: '700' }}
+                                    onClick={() => setShowDuplicateModal(false)}
+                                >
+                                    Dismiss
+                                </button>
+                                <button 
+                                    className="btn-primary" 
+                                    style={{ flex: 1, padding: '0.75rem', borderRadius: '0.75rem', fontWeight: '700' }}
+                                    onClick={() => {
+                                        setIsOverwriting(true);
+                                        setShowDuplicateModal(false);
+                                        toast.info('Overwriting mode enabled');
+                                    }}
+                                >
+                                    Continue Anyway
+                                </button>
+                            </div>
+                        </motion.div>
+                    </motion.div>
+                )}
             </AnimatePresence>
             
             {/* Layout Spacer for Dropdown Visibility */}
