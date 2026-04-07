@@ -1077,16 +1077,13 @@ const TeacherDashboard = () => {
                         {hasExistingRecords && !isOverwriting && (
                             <div className="warning-pill flex align-center gap-1" style={{ padding: '0.4rem 1rem', background: '#fff7ed', border: '1px solid #ffedd5', borderRadius: '1rem', color: '#9a3412', fontWeight: '700', fontSize: '0.85rem' }}>
                                 <AlertCircle size={16} />
-                                <span>Attendance already marked for this lecture.</span>
+                                <span>Attendance already marked for this lecture. Please select a different lecture.</span>
                                 <button 
-                                    className="btn-primary" 
-                                    style={{ padding: '0.2rem 0.6rem', fontSize: '0.75rem', marginLeft: '0.5rem' }}
-                                    onClick={() => {
-                                        setIsOverwriting(true);
-                                        toast.info('Overwriting mode enabled');
-                                    }}
+                                    className="btn-secondary" 
+                                    style={{ padding: '0.2rem 0.6rem', fontSize: '0.75rem', marginLeft: '0.5rem', background: 'white', border: '1px solid #f97316' }}
+                                    onClick={() => setShowDuplicateModal(true)}
                                 >
-                                    Continue
+                                    Select Different Lec
                                 </button>
                             </div>
                         )}
@@ -1931,7 +1928,7 @@ const TeacherDashboard = () => {
             )}
             </AnimatePresence>
             
-            {/* Duplicate Attendance Modal */}
+            {/* Duplicate Attendance Modal - STRICT BLOCK */}
             <AnimatePresence>
                 {showDuplicateModal && (
                     <motion.div 
@@ -1939,43 +1936,57 @@ const TeacherDashboard = () => {
                         animate={{ opacity: 1 }} 
                         exit={{ opacity: 0 }} 
                         className="modal-overlay flex-center"
-                        style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(15, 23, 42, 0.4)', backdropFilter: 'blur(4px)', zIndex: 10000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}
-                        onClick={() => setShowDuplicateModal(false)}
+                        style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(15, 23, 42, 0.6)', backdropFilter: 'blur(8px)', zIndex: 10000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}
                     >
                         <motion.div 
                             initial={{ scale: 0.9, y: 20 }} 
                             animate={{ scale: 1, y: 0 }} 
                             className="glass-card"
-                            style={{ background: 'white', padding: '2rem', borderRadius: '1.5rem', width: '100%', maxWidth: '400px', textAlign: 'center', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.3)', position: 'relative' }}
-                            onClick={(e) => e.stopPropagation()} // Prevent closing when clicking inside
+                            style={{ background: 'white', padding: '2.5rem', borderRadius: '2rem', width: '100%', maxWidth: '450px', textAlign: 'center', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)', position: 'relative', border: '2px solid #f97316' }}
+                            onClick={(e) => e.stopPropagation()}
                         >
-                            <div className="warning-icon-bg" style={{ width: '64px', height: '64px', background: '#fff7ed', borderRadius: '50%', margin: '0 auto 1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#f97316' }}>
-                                <AlertCircle size={32} />
+                            <div className="warning-icon-bg" style={{ width: '80px', height: '80px', background: '#fff7ed', borderRadius: '50%', margin: '0 auto 1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#f97316' }}>
+                                <AlertCircle size={40} />
                             </div>
-                            <h3 className="text-main font-bold mb-1" style={{ fontSize: '1.25rem' }}>Duplicate Attendance</h3>
-                            <p className="text-dim mb-2" style={{ fontSize: '0.95rem', lineHeight: '1.5', fontWeight: '500' }}>
-                                Already attendance is marked for this lecture. Please select a different lecture or overwrite the existing data.
+                            <h3 className="text-main font-bold mb-1" style={{ fontSize: '1.5rem' }}>Attendance Locked</h3>
+                            <p className="text-dim mb-3" style={{ fontSize: '1rem', lineHeight: '1.5', fontWeight: '600' }}>
+                                Attendance has already been marked for this lecture. Duplicate records are not allowed. Please select a different lecture to proceed.
                             </p>
-                            <div className="flex gap-1 mt-2">
-                                <button 
-                                    className="btn-secondary" 
-                                    style={{ flex: 1, padding: '0.75rem', borderRadius: '0.75rem', fontWeight: '700' }}
-                                    onClick={() => setShowDuplicateModal(false)}
+
+                            <div className="lecture-selection-box" style={{ background: '#f8fafc', padding: '1.25rem', borderRadius: '1rem', marginBottom: '1.5rem', textAlign: 'left', border: '1px solid #e2e8f0' }}>
+                                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: '800', color: '#64748b', textTransform: 'uppercase', marginBottom: '0.5rem' }}>Switch to Different Lec</label>
+                                <select 
+                                    className="input-field" 
+                                    style={{ width: '100%', padding: '0.85rem', borderRadius: '0.75rem', border: '1px solid #cbd5e1', backgroundColor: 'white', fontWeight: '600' }}
+                                    value={draftSubjectId}
+                                    onChange={(e) => setDraftSubjectId(e.target.value)}
                                 >
-                                    Dismiss
-                                </button>
-                                <button 
-                                    className="btn-primary" 
-                                    style={{ flex: 1, padding: '0.75rem', borderRadius: '0.75rem', fontWeight: '700' }}
-                                    onClick={() => {
-                                        setIsOverwriting(true);
-                                        setShowDuplicateModal(false);
-                                        toast.info('Overwriting mode enabled');
-                                    }}
-                                >
-                                    Continue Anyway
-                                </button>
+                                    <option value="">-- Choose Subject --</option>
+                                    {teacherSubjects.map(ts => (
+                                        <option key={ts._id} value={ts._id}>{ts.name} ({ts.code})</option>
+                                    ))}
+                                </select>
                             </div>
+
+                            <button 
+                                className="btn-primary" 
+                                style={{ width: '100%', padding: '1rem', borderRadius: '1rem', fontWeight: '800', fontSize: '1rem', background: 'var(--primary)', boxShadow: '0 10px 15px -3px rgba(79, 70, 229, 0.3)' }}
+                                onClick={() => {
+                                    if (!draftSubjectId) {
+                                        toast.error("Please select a subject");
+                                        return;
+                                    }
+                                    setSelectedSubjectId(draftSubjectId);
+                                    setShowDuplicateModal(false);
+                                    toast.success('Lecture switched successfully');
+                                }}
+                            >
+                                Change Lecture
+                            </button>
+                            
+                            <p style={{ marginTop: '1rem', fontSize: '0.8rem', color: '#94a3b8', fontWeight: '500' }}>
+                                To edit existing records, please use the <strong>Daily Logs</strong> tab.
+                            </p>
                         </motion.div>
                     </motion.div>
                 )}

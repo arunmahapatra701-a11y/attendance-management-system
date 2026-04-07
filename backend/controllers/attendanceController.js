@@ -14,6 +14,22 @@ const markAttendance = async (req, res) => {
         const attendanceDate = date ? new Date(date) : new Date();
         attendanceDate.setHours(0, 0, 0, 0);
 
+        // EXTRA SECURITY: Check if records already exist for this lecture to block duplicates at API level
+        const queryCheck = { 
+            date: attendanceDate, 
+            teacher: req.user.id, 
+            section: activeSection 
+        };
+        if (subject) queryCheck.subject = subject;
+
+        const existingRecords = await Attendance.countDocuments(queryCheck);
+        if (existingRecords > 0) {
+            return res.status(400).json({ 
+                message: 'Attendance already marked for this lecture. Submission blocked.',
+                code: 'DUPLICATE_ATTENDANCE'
+            });
+        }
+
         // LIGHTNING PERFORMANCE: Use bulkWrite instead of individual findOneAndUpdate
         const bulkOps = studentsAttendance.map(record => {
             const query = { 
