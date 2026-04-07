@@ -1027,50 +1027,8 @@ const TeacherDashboard = () => {
                                         className="filter-dropdown glass-card"
                                     >
                                         <div className="filter-section">
-                                            <h4>{view === 'attendance' ? 'Attendance Filtering' : 'Report & Log Filtering'}</h4>
+                                            <h4>Attendance Filtering</h4>
                                             
-                                            <div className="filter-group">
-                                                <p className="filter-label">Select Department(s)</p>
-                                                <div className="checkbox-grid">
-                                                    {availableDepartments.map(dept => (
-                                                        <label key={dept} className="checkbox-label">
-                                                            <input 
-                                                                type="checkbox" 
-                                                                checked={attFilter.departments.includes(dept)}
-                                                                onChange={(e) => {
-                                                                    const updatedDepts = e.target.checked 
-                                                                        ? [...attFilter.departments, dept]
-                                                                        : attFilter.departments.filter(d => d !== dept);
-                                                                    setAttFilter({...attFilter, departments: updatedDepts});
-                                                                }}
-                                                            />
-                                                            <span>{dept}</span>
-                                                        </label>
-                                                    ))}
-                                                </div>
-                                            </div>
-
-                                            <div className="filter-group">
-                                                <p className="filter-label">Select Semester(s)</p>
-                                                <div className="checkbox-grid">
-                                                    {availableSemesters.map(sem => (
-                                                        <label key={sem} className="checkbox-label">
-                                                            <input 
-                                                                type="checkbox" 
-                                                                checked={attFilter.semesters.includes(sem)}
-                                                                onChange={(e) => {
-                                                                    const updatedSems = e.target.checked 
-                                                                        ? [...attFilter.semesters, sem]
-                                                                        : attFilter.semesters.filter(s => s !== sem);
-                                                                    setAttFilter({...attFilter, semesters: updatedSems});
-                                                                }}
-                                                            />
-                                                            <span>Sem {sem}</span>
-                                                        </label>
-                                                    ))}
-                                                </div>
-                                            </div>
-
                                             <div className="filter-group">
                                                 <p className="filter-label">Subject Type</p>
                                                 <div className="checkbox-grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
@@ -1108,6 +1066,48 @@ const TeacherDashboard = () => {
                                                         ))
                                                     }
                                                 </select>
+                                            </div>
+
+                                            <div className="filter-group">
+                                                <p className="filter-label">Select Semester(s)</p>
+                                                <div className="checkbox-grid">
+                                                    {availableSemesters.map(sem => (
+                                                        <label key={sem} className="checkbox-label">
+                                                            <input 
+                                                                type="checkbox" 
+                                                                checked={attFilter.semesters.includes(sem)}
+                                                                onChange={(e) => {
+                                                                    const updatedSems = e.target.checked 
+                                                                        ? [...attFilter.semesters, sem]
+                                                                        : attFilter.semesters.filter(s => s !== sem);
+                                                                    setAttFilter({...attFilter, semesters: updatedSems});
+                                                                }}
+                                                            />
+                                                            <span>Sem {sem}</span>
+                                                        </label>
+                                                    ))}
+                                                </div>
+                                            </div>
+
+                                            <div className="filter-group">
+                                                <p className="filter-label">Select Department(s)</p>
+                                                <div className="checkbox-grid">
+                                                    {availableDepartments.map(dept => (
+                                                        <label key={dept} className="checkbox-label">
+                                                            <input 
+                                                                type="checkbox" 
+                                                                checked={attFilter.departments.includes(dept)}
+                                                                onChange={(e) => {
+                                                                    const updatedDepts = e.target.checked 
+                                                                        ? [...attFilter.departments, dept]
+                                                                        : attFilter.departments.filter(d => d !== dept);
+                                                                    setAttFilter({...attFilter, departments: updatedDepts});
+                                                                }}
+                                                            />
+                                                            <span>{dept}</span>
+                                                        </label>
+                                                    ))}
+                                                </div>
                                             </div>
 
                                             {teacherSubjects.find(s => s._id === selectedSubjectId)?.isLab && (
