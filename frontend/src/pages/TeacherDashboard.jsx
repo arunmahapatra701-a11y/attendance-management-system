@@ -45,9 +45,27 @@ const TeacherDashboard = () => {
     
     // Filter System States
     const [showFilters, setShowFilters] = useState(false);
-    const [attFilter, setAttFilter] = useState({ department: '', semester: '', remember: false });
+    const [attFilter, setAttFilter] = useState({ departments: [], semesters: [], remember: false });
     const [qaFilter, setQaFilter] = useState({ departments: [], semesters: [], digitsIds: {} });
     const [showQuickSubject, setShowQuickSubject] = useState(false);
+    
+    // Refs for outside click handling
+    const subjectDropdownRef = React.useRef(null);
+    const filtersDropdownRef = React.useRef(null);
+
+    // Auto-close dropdowns on outside click
+    useEffect(() => {
+        const handleClickOutside = (event) => {
+            if (subjectDropdownRef.current && !subjectDropdownRef.current.contains(event.target)) {
+                setShowQuickSubject(false);
+            }
+            if (filtersDropdownRef.current && !filtersDropdownRef.current.contains(event.target)) {
+                setShowFilters(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
     
     // Reset month selection on subject change
     useEffect(() => {
@@ -64,14 +82,14 @@ const TeacherDashboard = () => {
                 setAttFilter(parsed);
                 if (parsed.selectedBatches) setSelectedBatches(parsed.selectedBatches);
             } else {
-                setAttFilter({ department: '', semester: '', remember: false });
+                setAttFilter({ departments: [], semesters: [], remember: false });
                 setSelectedBatches([]);
             }
         } else {
             const subject = teacherSubjects.find(s => s._id === selectedSubjectId);
             setAttFilter({ 
-                department: subject?.department || '', 
-                semester: subject?.semester || '', 
+                departments: subject?.department ? [subject.department] : [], 
+                semesters: subject?.semester ? [subject.semester] : [], 
                 remember: false 
             });
             setSelectedBatches([]);
@@ -180,11 +198,10 @@ const TeacherDashboard = () => {
         const matchesSearch = s.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                               (s.rollNumber && s.rollNumber.toLowerCase().includes(searchTerm.toLowerCase()));
                               
-        const matchesDept = attFilter.department === '' || 
-                           String(s.department).toLowerCase() === String(attFilter.department).toLowerCase();
+        const matchesDept = attFilter.departments.some(d => String(d).toLowerCase() === String(s.department).toLowerCase());
         
-        const matchesSem = attFilter.semester === '' || 
-                           String(s.semester) === String(attFilter.semester);
+        const matchesSem = attFilter.semesters.length === 0 || 
+                           attFilter.semesters.some(sem => String(sem) === String(s.semester));
         
         let matchesBatch = true;
         const activeSub = teacherSubjects.find(sub => sub._id === selectedSubjectId);
@@ -512,7 +529,7 @@ const TeacherDashboard = () => {
     };
 
     const renderQuickSubjectMenu = () => (
-        <div className="filter-wrapper" style={{ position: 'relative' }}>
+        <div className="filter-wrapper" style={{ position: 'relative' }} ref={subjectDropdownRef}>
             <button 
                 className={`filter-btn ${showQuickSubject ? 'active' : ''}`}
                 onClick={() => { setShowQuickSubject(!showQuickSubject); setShowFilters(false); }}
@@ -662,10 +679,13 @@ const TeacherDashboard = () => {
                         )}
                         {renderMonthDropdown()}
                         {renderQuickSubjectMenu()}
-                        <div className="filter-wrapper" style={{ position: 'relative' }}>
+                        <div className="filter-wrapper" style={{ position: 'relative' }} ref={filtersDropdownRef}>
                             <button 
                                 className={`filter-btn ${showFilters ? 'active' : ''}`}
-                                onClick={() => setShowFilters(!showFilters)}
+                                onClick={() => { 
+                                    setShowFilters(!showFilters); 
+                                    setShowQuickSubject(false); 
+                                }}
                                 style={{ height: '42px' }}
                             >
                                 <Filter size={18} />
@@ -685,33 +705,45 @@ const TeacherDashboard = () => {
                                             <h4 style={{ marginBottom: '1rem', fontSize: '0.95rem', fontWeight: 800, color: 'var(--text-main)' }}>Report & Log Filtering</h4>
                                             
                                             <div className="filter-group">
-                                                <p className="filter-label">Select Department</p>
-                                                <select 
-                                                    className="input-field" 
-                                                    style={{ width: '100%', height: '42px', backgroundColor: 'white', fontWeight: '600' }}
-                                                    value={attFilter.department}
-                                                    onChange={(e) => setAttFilter({...attFilter, department: e.target.value})}
-                                                >
-                                                    <option value="">-- All Departments --</option>
+                                                <p className="filter-label">Select Department(s)</p>
+                                                <div className="checkbox-grid">
                                                     {availableDepartments.map(dept => (
-                                                        <option key={dept} value={dept}>{dept}</option>
+                                                        <label key={dept} className="checkbox-label">
+                                                            <input 
+                                                                type="checkbox" 
+                                                                checked={attFilter.departments.includes(dept)}
+                                                                onChange={(e) => {
+                                                                    const updatedDepts = e.target.checked 
+                                                                        ? [...attFilter.departments, dept]
+                                                                        : attFilter.departments.filter(d => d !== dept);
+                                                                    setAttFilter({...attFilter, departments: updatedDepts});
+                                                                }}
+                                                            />
+                                                            <span>{dept}</span>
+                                                        </label>
                                                     ))}
-                                                </select>
+                                                </div>
                                             </div>
 
                                             <div className="filter-group">
-                                                <p className="filter-label">Select Semester</p>
-                                                <select 
-                                                    className="input-field" 
-                                                    style={{ width: '100%', height: '42px', backgroundColor: 'white', fontWeight: '600' }}
-                                                    value={attFilter.semester}
-                                                    onChange={(e) => setAttFilter({...attFilter, semester: e.target.value})}
-                                                >
-                                                    <option value="">-- All Semesters --</option>
+                                                <p className="filter-label">Select Semester(s)</p>
+                                                <div className="checkbox-grid">
                                                     {availableSemesters.map(sem => (
-                                                        <option key={sem} value={sem}>Semester {sem}</option>
+                                                        <label key={sem} className="checkbox-label">
+                                                            <input 
+                                                                type="checkbox" 
+                                                                checked={attFilter.semesters.includes(sem)}
+                                                                onChange={(e) => {
+                                                                    const updatedSems = e.target.checked 
+                                                                        ? [...attFilter.semesters, sem]
+                                                                        : attFilter.semesters.filter(s => s !== sem);
+                                                                    setAttFilter({...attFilter, semesters: updatedSems});
+                                                                }}
+                                                            />
+                                                            <span>Sem {sem}</span>
+                                                        </label>
                                                     ))}
-                                                </select>
+                                                </div>
                                             </div>
 
                                             <div className="filter-group">
@@ -998,33 +1030,45 @@ const TeacherDashboard = () => {
                                             <h4>{view === 'attendance' ? 'Attendance Filtering' : 'Report & Log Filtering'}</h4>
                                             
                                             <div className="filter-group">
-                                                <p className="filter-label">Select Department</p>
-                                                <select 
-                                                    className="input-field" 
-                                                    style={{ width: '100%', height: '42px', backgroundColor: 'white', fontWeight: '600' }}
-                                                    value={attFilter.department}
-                                                    onChange={(e) => setAttFilter({...attFilter, department: e.target.value})}
-                                                >
-                                                    <option value="">-- All Departments --</option>
+                                                <p className="filter-label">Select Department(s)</p>
+                                                <div className="checkbox-grid">
                                                     {availableDepartments.map(dept => (
-                                                        <option key={dept} value={dept}>{dept}</option>
+                                                        <label key={dept} className="checkbox-label">
+                                                            <input 
+                                                                type="checkbox" 
+                                                                checked={attFilter.departments.includes(dept)}
+                                                                onChange={(e) => {
+                                                                    const updatedDepts = e.target.checked 
+                                                                        ? [...attFilter.departments, dept]
+                                                                        : attFilter.departments.filter(d => d !== dept);
+                                                                    setAttFilter({...attFilter, departments: updatedDepts});
+                                                                }}
+                                                            />
+                                                            <span>{dept}</span>
+                                                        </label>
                                                     ))}
-                                                </select>
+                                                </div>
                                             </div>
 
                                             <div className="filter-group">
-                                                <p className="filter-label">Select Semester</p>
-                                                <select 
-                                                    className="input-field" 
-                                                    style={{ width: '100%', height: '42px', backgroundColor: 'white', fontWeight: '600' }}
-                                                    value={attFilter.semester}
-                                                    onChange={(e) => setAttFilter({...attFilter, semester: e.target.value})}
-                                                >
-                                                    <option value="">-- All Semesters --</option>
+                                                <p className="filter-label">Select Semester(s)</p>
+                                                <div className="checkbox-grid">
                                                     {availableSemesters.map(sem => (
-                                                        <option key={sem} value={sem}>Semester {sem}</option>
+                                                        <label key={sem} className="checkbox-label">
+                                                            <input 
+                                                                type="checkbox" 
+                                                                checked={attFilter.semesters.includes(sem)}
+                                                                onChange={(e) => {
+                                                                    const updatedSems = e.target.checked 
+                                                                        ? [...attFilter.semesters, sem]
+                                                                        : attFilter.semesters.filter(s => s !== sem);
+                                                                    setAttFilter({...attFilter, semesters: updatedSems});
+                                                                }}
+                                                            />
+                                                            <span>Sem {sem}</span>
+                                                        </label>
                                                     ))}
-                                                </select>
+                                                </div>
                                             </div>
 
                                             <div className="filter-group">
@@ -1294,14 +1338,14 @@ const TeacherDashboard = () => {
                             Please choose a subject using the Subject Select button above to begin.
                         </p>
                     </div>
-                ) : !attFilter.department && view === 'attendance' ? (
+                ) : attFilter.departments.length === 0 && view === 'attendance' ? (
                     <div className="flex-center" style={{ padding: '4rem 1rem', flexDirection: 'column', textAlign: 'center', opacity: 0.7 }}>
                         <div style={{ padding: '1rem', background: 'rgba(15,23,42,0.05)', borderRadius: '50%', marginBottom: '1rem', color: 'var(--text-dim)' }}>
                             <Filter size={40} />
                         </div>
                         <h3 style={{ fontSize: '1.25rem', fontWeight: 600, color: 'var(--text-main)', marginBottom: '0.5rem' }}>Awaiting Selection</h3>
                         <p style={{ color: 'var(--text-dim)', maxWidth: '400px' }}>
-                            Please select a <strong>Department</strong> in the options menu to load the student roster.
+                            Please mark one or more <strong>Departments</strong> in the options menu to load the student roster.
                         </p>
                     </div>
                 ) : (
