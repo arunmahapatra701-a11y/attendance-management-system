@@ -106,7 +106,6 @@ h1, h2, h3, h4, h5, h6 {
   border-radius: 1.5rem;
   box-shadow: var(--shadow-lg);
   position: relative;
-  overflow: hidden;
 }
 
 /* Soft inner highlight to make it look 3D and premium */

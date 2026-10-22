@@ -3,7 +3,7 @@ import axios from 'axios';
 import { useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { motion, AnimatePresence } from 'framer-motion';
-import { CheckCircle2, XCircle, Clock, Users, Search, Send, Calendar as CalendarIcon, Filter, AlertCircle, ChevronDown, ChevronRight, Hash, Layers, ListFilter, ClipboardCheck, BarChart2, Download, BookOpen, PlusCircle, Building, Bell, Zap, UploadCloud, FileText } from 'lucide-react';
+import { CheckCircle2, XCircle, Clock, Users, Search, Send, Calendar as CalendarIcon, Filter, AlertCircle, ChevronDown, ChevronRight, Hash, Layers, ListFilter, ClipboardCheck, BarChart2, Download, BookOpen, PlusCircle, Building, Bell, Zap, UploadCloud, FileText, Trash2 } from 'lucide-react';
 
 
 
@@ -41,6 +41,7 @@ const TeacherDashboard = () => {
     const [isMaterialModalOpen, setIsMaterialModalOpen] = useState(false);
     const [teacherSubjects, setTeacherSubjects] = useState([]);
     const [materials, setMaterials] = useState([]);
+    const [notices, setNotices] = useState([]);
     const [materialForm, setMaterialForm] = useState({
         title: '', subject: '', subjectCode: '', department: '', semester: '', link: '', file: null
     });
@@ -124,6 +125,9 @@ const TeacherDashboard = () => {
                 
                 const matsRes = await axios.get('/api/materials');
                 setMaterials(matsRes.data.materials);
+                
+                const noticesRes = await axios.get('/api/notices');
+                setNotices(noticesRes.data);
             } catch (err) {
                 console.error("Failed to load materials or subjects", err);
             }
@@ -183,6 +187,18 @@ const TeacherDashboard = () => {
         setAttendance(prev => ({ ...prev, [studentId]: status }));
     };
 
+    const activeSubject = React.useMemo(() => 
+        teacherSubjects.find(s => s._id === selectedSubjectId),
+    [teacherSubjects, selectedSubjectId]);
+
+    const isFilterComplete = React.useMemo(() => {
+        if (!selectedSubjectId) return false;
+        if (attFilter.departments.length === 0) return false;
+        if (attFilter.semesters.length === 0) return false;
+        if (activeSubject?.isLab && selectedBatches.length === 0) return false;
+        return true;
+    }, [selectedSubjectId, attFilter.departments, attFilter.semesters, activeSubject, selectedBatches]);
+
     const handleSubmit = async () => {
         setIsSubmitting(true);
         setMessage({ type: '', text: '' });
@@ -216,29 +232,32 @@ const TeacherDashboard = () => {
                               
         const matchesDept = attFilter.departments.some(d => String(d).toLowerCase() === String(s.department).toLowerCase());
         
-        const matchesSem = attFilter.semesters.length === 0 || 
-                           attFilter.semesters.some(sem => String(sem) === String(s.semester));
+        const matchesSem = attFilter.semesters.some(sem => String(sem) === String(s.semester));
         
         let matchesBatch = true;
-        const activeSub = teacherSubjects.find(sub => sub._id === selectedSubjectId);
-        if (activeSub?.isLab && selectedBatches.length > 0) {
-            // Robust numeric extraction: find all numbers and take the last sequence
-            const rawRoll = String(s.rollNumber || '');
-            const numMatch = rawRoll.match(/(\d+)$/);
-            if (numMatch) {
-                const roll = parseInt(numMatch[1], 10);
-                matchesBatch = activeSub.batches.some(b => 
-                    selectedBatches.includes(b.batchName) && 
-                    roll >= b.startRoll && 
-                    roll <= b.endRoll
-                );
+        if (activeSubject?.isLab) {
+            if (selectedBatches.length > 0) {
+                const rawRoll = String(s.rollNumber || '');
+                const numMatch = rawRoll.match(/(\d+)$/);
+                if (numMatch) {
+                    const roll = parseInt(numMatch[1], 10);
+                    matchesBatch = activeSubject.batches.some(b => 
+                        selectedBatches.includes(b.batchName) && 
+                        roll >= b.startRoll && 
+                        roll <= b.endRoll
+                    );
+                } else {
+                    matchesBatch = false;
+                }
             } else {
-                matchesBatch = false; // No numeric component found, excluded if batch filter active
+                matchesBatch = false; // Force batch selection for labs
             }
         }
         
         return matchesSearch && matchesDept && matchesSem && matchesBatch;
     });
+
+    const canSave = !isLoading && isFilterComplete && filteredStudents.length > 0;
 
     const availableDepartments = [...new Set(students.map(s => s.department).filter(Boolean))];
     const availableSemesters = [...new Set(students.map(s => s.semester).filter(Boolean))].sort();
@@ -276,7 +295,8 @@ const TeacherDashboard = () => {
         e.preventDefault();
         setIsSubmitting(true);
         try {
-            await axios.post('/api/notices', noticeForm);
+            const { data } = await axios.post('/api/notices', noticeForm);
+            setNotices([data, ...notices]);
             setMessage({ type: 'success', text: 'Notice successfully posted!' });
             setNoticeForm({ title: '', message: '', category: 'General', department: '', semester: '' });
             setTimeout(() => setMessage({ type: '', text: '' }), 4000);
@@ -285,6 +305,18 @@ const TeacherDashboard = () => {
             setTimeout(() => setMessage({ type: '', text: '' }), 4000);
         } finally {
             setIsSubmitting(false);
+        }
+    };
+
+    const handleDeleteNotice = async (id) => {
+        if (!window.confirm("Are you sure you want to remove this notice?")) return;
+        try {
+            await axios.delete(`/api/notices/${id}`);
+            setNotices(notices.filter(n => n._id !== id));
+            setMessage({ type: 'success', text: 'Notice removed successfully' });
+            setTimeout(() => setMessage({ type: '', text: '' }), 3000);
+        } catch (error) {
+            setMessage({ type: 'error', text: 'Failed to delete notice' });
         }
     };
 
@@ -357,6 +389,21 @@ const TeacherDashboard = () => {
 
     // Group logs by Date AND Section
     const filteredLogs = logs.filter(log => {
+        const matchesSearch = !searchTerm || 
+            (log.student?.name?.toLowerCase().includes(searchTerm.toLowerCase())) ||
+            (log.student?.rollNumber?.toLowerCase().includes(searchTerm.toLowerCase()));
+        if (!matchesSearch) return false;
+
+        if (attFilter.departments.length > 0) {
+            const matchesDept = attFilter.departments.some(d => String(d).toLowerCase() === String(log.student?.department).toLowerCase());
+            if (!matchesDept) return false;
+        }
+
+        if (attFilter.semesters.length > 0) {
+            const matchesSem = attFilter.semesters.some(sem => String(sem) === String(log.student?.semester));
+            if (!matchesSem) return false;
+        }
+
         if (selectedMonths.length === 0) return true;
         const mStr = new Date(log.date).toLocaleString('default', { month: 'long', year: 'numeric' });
         return selectedMonths.includes(mStr);
@@ -552,6 +599,7 @@ const TeacherDashboard = () => {
                     if (!showQuickSubject) setDraftSubjectId(selectedSubjectId);
                     setShowQuickSubject(!showQuickSubject);
                     setShowFilters(false);
+                    setShowMonthDropdown(false);
                 }}
             >
                 <BookOpen size={18} />
@@ -565,7 +613,7 @@ const TeacherDashboard = () => {
                         animate={{ opacity: 1, y: 0, scale: 1 }}
                         exit={{ opacity: 0, y: 10, scale: 0.95 }}
                         className="filter-dropdown glass-card"
-                        style={{ position: 'absolute', top: 'calc(100% + 12px)', right: 0, width: '280px', zIndex: 110, padding: '1.25rem' }}
+                        style={{ position: 'absolute', top: 'calc(100% + 12px)', right: 0, width: '280px', zIndex: 2000, padding: '1.25rem' }}
                     >
                         <p className="filter-label" style={{ marginBottom: '0.75rem', fontWeight: '800' }}>Quick Subject Select</p>
                         <select 
@@ -585,7 +633,8 @@ const TeacherDashboard = () => {
                             onClick={() => {
                                 setSelectedSubjectId(draftSubjectId);
                                 setShowQuickSubject(false);
-                                toast.success('Subject switched successfully');
+                                setMessage({ type: 'success', text: 'Subject switched successfully' });
+                                setTimeout(() => setMessage({ type: '', text: '' }), 4000);
                             }}
                         >
                             Apply Selection
@@ -621,7 +670,7 @@ const TeacherDashboard = () => {
                         animate={{ opacity: 1, y: 0, scale: 1 }}
                         exit={{ opacity: 0, y: 10, scale: 0.95 }}
                         className="filter-dropdown glass-card shadow-lg"
-                        style={{ position: 'absolute', top: 'calc(100% + 12px)', right: 0, width: '240px', zIndex: 110, padding: '1.25rem' }}
+                        style={{ position: 'absolute', top: 'calc(100% + 12px)', right: 0, width: '240px', zIndex: 2000, padding: '1.25rem' }}
                     >
                         <h4 style={{ marginBottom: '1rem', fontSize: '0.9rem', color: 'var(--text-main)', fontWeight: 800 }}>Attendance Months</h4>
                         <div className="checkbox-grid" style={{ gridTemplateColumns: '1fr', gap: '0.65rem', maxHeight: '200px', overflowY: 'auto', paddingRight: '0.5rem' }}>
@@ -694,228 +743,8 @@ const TeacherDashboard = () => {
                     </div>
                 </div>
                 
-                {view === 'log' && (
+                {(view === 'log' || view === 'reports') && (
                     <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-                        {selectedSubjectId && (
-                            <div className="metric-pill" style={{ color: 'var(--primary)', background: 'var(--primary-light)', fontWeight: '700', padding: '0.5rem 1rem' }}>
-                                {teacherSubjects.find(s => s._id === selectedSubjectId)?.name || 'Subject'}
-                            </div>
-                        )}
-                        {renderMonthDropdown()}
-                        {renderQuickSubjectMenu()}
-                        <div className="filter-wrapper" style={{ position: 'relative' }} ref={logFiltersRef}>
-                            <button 
-                                className={`filter-btn ${showFilters ? 'active' : ''}`}
-                                onClick={() => { 
-                                    setShowFilters(!showFilters); 
-                                    setShowQuickSubject(false); 
-                                }}
-                                style={{ height: '42px' }}
-                            >
-                                <Filter size={18} />
-                                <span>Options</span>
-                            </button>
-                            
-                            <AnimatePresence>
-                                {showFilters && (
-                                    <motion.div 
-                                        initial={{ opacity: 0, y: 10, scale: 0.95 }}
-                                        animate={{ opacity: 1, y: 0, scale: 1 }}
-                                        exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                                        className="filter-dropdown glass-card"
-                                        style={{ position: 'absolute', top: 'calc(100% + 12px)', right: 0, width: '320px', zIndex: 100 }}
-                                    >
-                                        <div className="filter-section">
-                                            <h4 style={{ marginBottom: '1rem', fontSize: '0.95rem', fontWeight: 800, color: 'var(--text-main)' }}>Report & Log Filtering</h4>
-                                            
-                                            <div className="filter-group">
-                                                <p className="filter-label">Select Department(s)</p>
-                                                <div className="checkbox-grid">
-                                                    {availableDepartments.map(dept => (
-                                                        <label key={dept} className="checkbox-label">
-                                                            <input 
-                                                                type="checkbox" 
-                                                                checked={attFilter.departments.includes(dept)}
-                                                                onChange={(e) => {
-                                                                    const updatedDepts = e.target.checked 
-                                                                        ? [...attFilter.departments, dept]
-                                                                        : attFilter.departments.filter(d => d !== dept);
-                                                                    setAttFilter({...attFilter, departments: updatedDepts});
-                                                                }}
-                                                            />
-                                                            <span>{dept}</span>
-                                                        </label>
-                                                    ))}
-                                                </div>
-                                            </div>
-
-                                            <div className="filter-group">
-                                                <p className="filter-label">Select Semester(s)</p>
-                                                <div className="checkbox-grid">
-                                                    {availableSemesters.map(sem => (
-                                                        <label key={sem} className="checkbox-label">
-                                                            <input 
-                                                                type="checkbox" 
-                                                                checked={draftFilter.semesters.includes(sem)}
-                                                                onChange={(e) => {
-                                                                    const updatedSems = e.target.checked 
-                                                                        ? [...draftFilter.semesters, sem]
-                                                                        : draftFilter.semesters.filter(s => s !== sem);
-                                                                    setDraftFilter({...draftFilter, semesters: updatedSems});
-                                                                }}
-                                                            />
-                                                            <span>Sem {sem}</span>
-                                                        </label>
-                                                    ))}
-                                                </div>
-                                            </div>
-
-                                            <div className="filter-group">
-                                                <p className="filter-label">Select Department(s)</p>
-                                                <div className="checkbox-grid">
-                                                    {availableDepartments.map(dept => (
-                                                        <label key={dept} className="checkbox-label">
-                                                            <input 
-                                                                type="checkbox" 
-                                                                checked={draftFilter.departments.includes(dept)}
-                                                                onChange={(e) => {
-                                                                    const updatedDepts = e.target.checked 
-                                                                        ? [...draftFilter.departments, dept]
-                                                                        : draftFilter.departments.filter(d => d !== dept);
-                                                                    setDraftFilter({...draftFilter, departments: updatedDepts});
-                                                                }}
-                                                            />
-                                                            <span>{dept}</span>
-                                                        </label>
-                                                    ))}
-                                                </div>
-                                            </div>
-
-                                            <button 
-                                                className="btn-primary" 
-                                                style={{ width: '100%', marginTop: '1rem', marginBottom: '1rem', padding: '0.8rem', borderRadius: '0.75rem', fontWeight: '700', fontSize: '0.9rem' }}
-                                                onClick={() => {
-                                                    setAttFilter({...draftFilter});
-                                                    toast.success('Filters applied successfully');
-                                                }}
-                                            >
-                                                Apply Selected Filters
-                                            </button>
-
-                                            <label className="checkbox-label remember-check">
-                                                <input 
-                                                    type="checkbox" 
-                                                    checked={draftFilter.remember}
-                                                    onChange={(e) => setDraftFilter({...draftFilter, remember: e.target.checked})}
-                                                />
-                                                <span>Remember my settings</span>
-                                            </label>
-
-                                            <div className="filter-group">
-                                                <p className="filter-label">Subject Type</p>
-                                                <div className="checkbox-grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
-                                                    {['All', 'Theory', 'Lab'].map(type => (
-                                                        <label key={type} className="checkbox-label">
-                                                            <input 
-                                                                type="radio" 
-                                                                name="subjectTypeLog"
-                                                                checked={selectedSubjectType === type}
-                                                                onChange={() => setSelectedSubjectType(type)}
-                                                            />
-                                                            <span>{type}</span>
-                                                        </label>
-                                                    ))}
-                                                </div>
-                                            </div>
-
-                                            <div className="filter-group">
-                                                <p className="filter-label">Subject Selection</p>
-                                                <select 
-                                                    className="input-field" 
-                                                    style={{ width: '100%', height: '42px', backgroundColor: 'white', paddingRight: '2.5rem', appearance: 'auto', fontWeight: '600' }}
-                                                    value={selectedSubjectId}
-                                                    onChange={(e) => setSelectedSubjectId(e.target.value)}
-                                                >
-                                                    <option value="">-- Choose Subject --</option>
-                                                    {teacherSubjects
-                                                        .filter(s => {
-                                                            if (selectedSubjectType === 'All') return true;
-                                                            if (selectedSubjectType === 'Theory') return !s.isLab;
-                                                            if (selectedSubjectType === 'Lab') return s.isLab;
-                                                            return true;
-                                                        })
-                                                        .map(ts => (
-                                                            <option key={ts._id} value={ts._id}>{ts.name} ({ts.code})</option>
-                                                        ))
-                                                    }
-                                                </select>
-                                            </div>
-
-                                            {teacherSubjects.find(s => s._id === selectedSubjectId)?.isLab && (
-                                                <div className="filter-group" style={{ border: '1px solid rgba(219,39,119,0.1)', padding: '0.75rem', borderRadius: '0.75rem', background: 'rgba(219,39,119,0.02)', marginTop: '1rem' }}>
-                                                    <p className="filter-label" style={{ color: 'var(--secondary)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                                        <Layers size={14} /> Batch Selection (Multiple)
-                                                    </p>
-                                                    <div className="checkbox-grid" style={{ gridTemplateColumns: 'repeat(2, 1fr)' }}>
-                                                        {teacherSubjects.find(s => s._id === selectedSubjectId).batches.map(batch => (
-                                                            <label key={batch.batchName} className="checkbox-label">
-                                                                <input 
-                                                                    type="checkbox" 
-                                                                    checked={selectedBatches.includes(batch.batchName)}
-                                                                    onChange={(e) => {
-                                                                        if (e.target.checked) setSelectedBatches([...selectedBatches, batch.batchName]);
-                                                                        else setSelectedBatches(selectedBatches.filter(b => b !== batch.batchName));
-                                                                    }}
-                                                                />
-                                                                <span style={{ fontSize: '0.8rem' }}>{batch.batchName}</span>
-                                                            </label>
-                                                        ))}
-                                                    </div>
-                                                </div>
-                                            )}
-
-                                            <label className="checkbox-label remember-check">
-                                                <input 
-                                                    type="checkbox" 
-                                                    checked={attFilter.remember}
-                                                    onChange={(e) => setAttFilter({...attFilter, remember: e.target.checked})}
-                                                />
-                                                <span>Remember my settings</span>
-                                            </label>
-
-                                            <div className="filter-section mt-1" style={{ borderTop: '1px solid var(--border)', paddingTop: '1rem', marginTop: '1rem' }}>
-                                                <h4 className="flex align-center gap-sm" style={{ fontSize: '0.9rem', color: 'var(--text-main)', marginBottom: '0.75rem' }}>
-                                                    <CalendarIcon size={14} /> Month Filter
-                                                </h4>
-                                                <div className="checkbox-grid" style={{ maxHeight: '150px', overflowY: 'auto', gridTemplateColumns: '1fr' }}>
-                                                    {availableMonths.map(month => (
-                                                        <label key={month} className="checkbox-label">
-                                                            <input 
-                                                                type="checkbox" 
-                                                                checked={selectedMonths.includes(month)}
-                                                                onChange={(e) => {
-                                                                    if (e.target.checked) setSelectedMonths([...selectedMonths, month]);
-                                                                    else setSelectedMonths(selectedMonths.filter(m => m !== month));
-                                                                }}
-                                                            />
-                                                            <span style={{ fontSize: '0.85rem' }}>{month}</span>
-                                                        </label>
-                                                    ))}
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </motion.div>
-                                )}
-                            </AnimatePresence>
-                        </div>
-                        <button 
-                            className="btn-primary" 
-                            onClick={handleSubmit} 
-                            disabled={isSubmitting || (hasExistingRecords && !isOverwriting)}
-                            style={{ gap: '0.6rem', display: 'flex', alignItems: 'center', height: '42px', padding: '0 1.2rem', boxShadow: '0 4px 15px rgba(59, 130, 246, 0.25)', fontWeight: '600', letterSpacing: '0.01em' }}
-                        >
-                            {isSubmitting ? <span className="spinner"></span> : <><Send size={18} /> {hasExistingRecords ? 'Overwrite Records' : 'Save Records'}</>}
-                        </button>
                         <button 
                             className="btn-primary export-excel-btn" 
                             onClick={downloadExcelReport}
@@ -937,30 +766,38 @@ const TeacherDashboard = () => {
                 )}
                 
                 {view === 'attendance' && (
-                    <div className="mode-selectors" style={{ display: 'flex', gap: '1rem' }}>
-                        <div className="date-picker glass-card">
-                            <div className="dp-icon-wrapper">
-                                <Hash size={20} className="text-primary" />
+                        <div className="mode-selectors" style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+                            <div className="date-picker glass-card">
+                                <div className="dp-icon-wrapper">
+                                    <Hash size={20} className="text-primary" />
+                                </div>
+                                <select value={section} onChange={(e) => setSection(e.target.value)} className="date-input" style={{ width: '160px' }}>
+                                    <option value="Regular Class">Regular Class (L1)</option>
+                                    <option value="Morning Session">Morning Session (L2)</option>
+                                    <option value="Afternoon Session">Afternoon Session (L3)</option>
+                                    <option value="Lab Practical">Lab Practical (L4)</option>
+                                </select>
                             </div>
-                            <select value={section} onChange={(e) => setSection(e.target.value)} className="date-input" style={{ width: '160px' }}>
-                                <option value="Regular Class">Regular Class (L1)</option>
-                                <option value="Morning Session">Morning Session (L2)</option>
-                                <option value="Afternoon Session">Afternoon Session (L3)</option>
-                                <option value="Lab Practical">Lab Practical (L4)</option>
-                            </select>
-                        </div>
-                        <div className="date-picker glass-card">
-                            <div className="dp-icon-wrapper">
-                                <CalendarIcon size={20} className="text-primary" />
+                            <div className="date-picker glass-card">
+                                <div className="dp-icon-wrapper">
+                                    <CalendarIcon size={20} className="text-primary" />
+                                </div>
+                                <input 
+                                    type="date" 
+                                    value={date} 
+                                    onChange={(e) => setDate(e.target.value)} 
+                                    className="date-input" 
+                                />
                             </div>
-                            <input 
-                                type="date" 
-                                value={date} 
-                                onChange={(e) => setDate(e.target.value)} 
-                                className="date-input" 
-                            />
+                            <button 
+                                className="btn-primary" 
+                                onClick={handleSubmit} 
+                                disabled={isSubmitting || !canSave}
+                                style={{ gap: '0.6rem', display: 'flex', alignItems: 'center', height: '42px', padding: '0 1.2rem', boxShadow: '0 4px 15px rgba(59, 130, 246, 0.25)', fontWeight: '600', letterSpacing: '0.01em', marginLeft: '0.5rem', opacity: canSave ? 1 : 0.6 }}
+                            >
+                                {isSubmitting ? <span className="spinner"></span> : <><Send size={18} /> Save Records</>}
+                            </button>
                         </div>
-                    </div>
                 )}
             </header>
 
@@ -1074,19 +911,6 @@ const TeacherDashboard = () => {
                     </div>
                     
                     <div className="action-cluster" style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-                        {hasExistingRecords && !isOverwriting && (
-                            <div className="warning-pill flex align-center gap-1" style={{ padding: '0.4rem 1rem', background: '#fff7ed', border: '1px solid #ffedd5', borderRadius: '1rem', color: '#9a3412', fontWeight: '700', fontSize: '0.85rem' }}>
-                                <AlertCircle size={16} />
-                                <span>Attendance already marked for this lecture. Please select a different lecture.</span>
-                                <button 
-                                    className="btn-secondary" 
-                                    style={{ padding: '0.2rem 0.6rem', fontSize: '0.75rem', marginLeft: '0.5rem', background: 'white', border: '1px solid #f97316' }}
-                                    onClick={() => setShowDuplicateModal(true)}
-                                >
-                                    Select Different Lec
-                                </button>
-                            </div>
-                        )}
                         {selectedSubjectId && (view === 'reports' || view === 'attendance' || view === 'log') && (
                             <div className="metric-pill" style={{ color: 'var(--primary)', background: 'var(--primary-light)', fontWeight: '700', padding: '0.5rem 1rem' }}>
                                 {teacherSubjects.find(s => s._id === selectedSubjectId)?.name || 'Subject'}
@@ -1101,6 +925,8 @@ const TeacherDashboard = () => {
                                 onClick={() => {
                                     if (!showFilters) setDraftFilter({...attFilter});
                                     setShowFilters(!showFilters);
+                                    setShowQuickSubject(false);
+                                    setShowMonthDropdown(false);
                                 }}
                             >
                                 <Filter size={18} />
@@ -1222,34 +1048,12 @@ const TeacherDashboard = () => {
                                                 </div>
                                             )}
 
-                                            <button 
-                                                className="btn-primary" 
-                                                style={{ width: '100%', marginTop: '1rem', marginBottom: '1rem', padding: '0.8rem', borderRadius: '0.75rem', fontWeight: '700', fontSize: '0.9rem' }}
-                                                onClick={() => {
-                                                    setSelectedSubjectId(draftSubjectId);
-                                                    setAttFilter({...draftFilter});
-                                                    setShowFilters(false);
-                                                    toast.success('Filters applied successfully');
-                                                }}
-                                            >
-                                                Apply Selected Filters
-                                            </button>
-
-                                            <label className="checkbox-label remember-check">
-                                                <input 
-                                                    type="checkbox" 
-                                                    checked={draftFilter.remember}
-                                                    onChange={(e) => setDraftFilter({...draftFilter, remember: e.target.checked})}
-                                                />
-                                                <span>Remember my settings</span>
-                                            </label>
-
                                             {(view === 'reports' || view === 'log') && (
-                                                <div className="filter-section mt-1" style={{ borderTop: '1px solid var(--border)', paddingTop: '1rem', marginTop: '1rem' }}>
+                                                <div className="filter-section mt-1" style={{ borderTop: '1px solid var(--border)', paddingTop: '1rem', marginTop: '1rem', marginBottom: '1rem' }}>
                                                     <h4 className="flex align-center gap-sm" style={{ fontSize: '0.9rem', color: 'var(--text-main)', marginBottom: '0.75rem' }}>
-                                                        <Calendar size={14} /> Month Filter
+                                                        <CalendarIcon size={14} /> Month Filter
                                                     </h4>
-                                                    <div className="checkbox-grid" style={{ maxHeight: '150px', overflowY: 'auto' }}>
+                                                    <div className="checkbox-grid" style={{ maxHeight: '150px', overflowY: 'auto', paddingRight: '0.5rem' }}>
                                                         {availableMonths.map(month => (
                                                             <label key={month} className="checkbox-label">
                                                                 <input 
@@ -1266,6 +1070,29 @@ const TeacherDashboard = () => {
                                                     </div>
                                                 </div>
                                             )}
+
+                                            <button 
+                                                className="btn-primary" 
+                                                style={{ width: '100%', marginTop: '0.5rem', marginBottom: '1rem', padding: '0.85rem', borderRadius: '0.85rem', fontWeight: '800', fontSize: '0.95rem', boxShadow: '0 4px 12px rgba(79, 70, 229, 0.2)' }}
+                                                onClick={() => {
+                                                    setSelectedSubjectId(draftSubjectId);
+                                                    setAttFilter({...draftFilter});
+                                                    setShowFilters(false);
+                                                    setMessage({ type: 'success', text: 'Filters applied successfully' });
+                                                    setTimeout(() => setMessage({ type: '', text: '' }), 4000);
+                                                }}
+                                            >
+                                                Apply Selected Filters
+                                            </button>
+
+                                            <label className="checkbox-label remember-check" style={{ marginTop: '0' }}>
+                                                <input 
+                                                    type="checkbox" 
+                                                    checked={draftFilter.remember}
+                                                    onChange={(e) => setDraftFilter({...draftFilter, remember: e.target.checked})}
+                                                />
+                                                <span>Remember my settings</span>
+                                            </label>
                                         </div>
 
                                         {view === 'attendance' && (
@@ -1395,9 +1222,9 @@ const TeacherDashboard = () => {
                         {view === 'attendance' && (
                             <button 
                                 className="btn-primary" 
-                                style={{ height: '100%' }}
+                                style={{ height: '100%', opacity: canSave ? 1 : 0.6 }}
                                 onClick={handleSubmit}
-                                disabled={isSubmitting}
+                                disabled={isSubmitting || !canSave}
                             >
                                 {isSubmitting ? (
                                     <span className="spinner"></span>
@@ -1438,14 +1265,24 @@ const TeacherDashboard = () => {
                             Please choose a subject using the Subject Select button above to begin.
                         </p>
                     </div>
-                ) : attFilter.departments.length === 0 && view === 'attendance' ? (
+                ) : (!isFilterComplete && view === 'attendance') ? (
                     <div className="flex-center" style={{ padding: '4rem 1rem', flexDirection: 'column', textAlign: 'center', opacity: 0.7 }}>
                         <div style={{ padding: '1rem', background: 'rgba(15,23,42,0.05)', borderRadius: '50%', marginBottom: '1rem', color: 'var(--text-dim)' }}>
                             <Filter size={40} />
                         </div>
                         <h3 style={{ fontSize: '1.25rem', fontWeight: 600, color: 'var(--text-main)', marginBottom: '0.5rem' }}>Awaiting Selection</h3>
                         <p style={{ color: 'var(--text-dim)', maxWidth: '400px' }}>
-                            Please mark one or more <strong>Departments</strong> in the options menu to load the student roster.
+                            Please select a <strong>Subject</strong>, <strong>Department</strong>, and <strong>Semester</strong>{activeSubject?.isLab ? ' and **Batch**' : ''} in the options menu to load the student roster and mark attendance.
+                        </p>
+                    </div>
+                ) : (filteredStudents.length === 0 && view === 'attendance') ? (
+                    <div className="flex-center" style={{ padding: '4rem 1rem', flexDirection: 'column', textAlign: 'center', opacity: 0.7 }}>
+                        <div style={{ padding: '1rem', background: 'rgba(15,23,42,0.05)', borderRadius: '50%', marginBottom: '1rem', color: 'var(--error)' }}>
+                            <Users size={40} />
+                        </div>
+                        <h3 style={{ fontSize: '1.25rem', fontWeight: 600, color: 'var(--text-main)', marginBottom: '0.5rem' }}>No Students Found</h3>
+                        <p style={{ color: 'var(--text-dim)', maxWidth: '400px' }}>
+                            No students match your current filter settings. Try adjusting the department or semester.
                         </p>
                     </div>
                 ) : (
@@ -1634,113 +1471,295 @@ const TeacherDashboard = () => {
             )}
 
             {view === 'log' && (
-                <motion.div key="log-view" initial={{opacity: 0, x: 20}} animate={{opacity: 1, x: 0}} exit={{opacity: 0, x: -20}}>
-                    
-                    <section className="stats-grid mb-3">
+                <motion.div key="daily-log-view" initial={{opacity: 0, x: 20}} animate={{opacity: 1, x: 0}} exit={{opacity: 0, x: -20}}>
+                     <section className="stats-grid">
                         <div className="stat-card glass-card">
-                            <div className="stat-icon bg-primary-light text-primary"><Users /></div>
+                            <div className="stat-icon bg-primary-light text-primary"><ClipboardCheck /></div>
                             <div className="stat-content">
                                 <h3>{stats.total}</h3>
-                                <p>Total Points Logged</p>
+                                <p>Historical Records</p>
                             </div>
                         </div>
                         <div className="stat-card glass-card">
                             <div className="stat-icon bg-success-light text-success"><CheckCircle2 /></div>
                             <div className="stat-content">
                                 <h3>{stats.present}</h3>
-                                <p>Aggregate Presents</p>
+                                <p>Total Present</p>
                             </div>
                         </div>
                         <div className="stat-card glass-card">
                             <div className="stat-icon bg-error-light text-error"><XCircle /></div>
                             <div className="stat-content">
                                 <h3>{stats.absent}</h3>
-                                <p>Aggregate Absents</p>
+                                <p>Total Absent</p>
                             </div>
                         </div>
                         <div className="stat-card glass-card">
                             <div className="stat-icon bg-warning-light text-warning"><Clock /></div>
                             <div className="stat-content">
                                 <h3>{stats.late}</h3>
-                                <p>Aggregate Lates</p>
+                                <p>Total Lates</p>
                             </div>
                         </div>
                     </section>
 
-                    {!selectedSubjectId ? (
-                        <div className="flex-center" style={{ padding: '4rem 1rem', flexDirection: 'column', textAlign: 'center', opacity: 0.7 }}>
-                            <div style={{ padding: '1rem', background: 'var(--primary-light)', borderRadius: '50%', marginBottom: '1rem', color: 'var(--primary)' }}>
-                                <Layers size={40} />
+                    <div className="attendance-container glass-card">
+                        <div className="table-header flex justify-between align-center mb-2">
+                            <div className="search-box border-light">
+                                <Search size={18} className="search-icon" />
+                                <input 
+                                    type="text" 
+                                    className="input-field"
+                                    placeholder="Search student or roll in logs..." 
+                                    value={searchTerm}
+                                    onChange={(e) => setSearchTerm(e.target.value)}
+                                />
                             </div>
-                            <h3 style={{ fontSize: '1.25rem', fontWeight: 600, color: 'var(--text-main)', marginBottom: '0.5rem' }}>No Subject Selected</h3>
-                            <p style={{ color: 'var(--text-dim)', maxWidth: '400px' }}>Please choose a subject using the Quick Subject Select button above to view historical daily logs.</p>
-                        </div>
-                    ) : (
-                    <div className="logs-container">
-                        {Object.keys(groupedLogs).length === 0 ? (
-                            <div className="empty-state text-dim flex-center mt-3" style={{ height: '20vh', fontWeight: '600' }}>No attendance records found yet.</div>
-                        ) : Object.keys(groupedLogs).map((key) => {
-                            const grp = groupedLogs[key];
-                            const isActive = activeLogKey === key;
-                            return (
-                                <div key={key} className="log-panel glass-card mb-2" style={{ padding: '0', overflow: 'hidden' }}>
-                                    <div className="log-header" onClick={() => setActiveLogKey(isActive ? null : key)} style={{ padding: '1.25rem 1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', background: isActive ? 'rgba(15, 23, 42, 0.02)' : 'transparent' }}>
-                                        <div className="lh-main flex align-center gap-1">
-                                            <div className="lh-icon bg-primary-light text-primary" style={{ padding: '0.65rem', borderRadius: '0.75rem' }}><CalendarIcon size={20} /></div>
-                                            <div>
-                                                <h3 className="text-main font-semibold" style={{ fontSize: '1.1rem', marginBottom: '0.2rem' }}>{grp.dateStr}</h3>
-                                                <p className="text-dim" style={{ fontSize: '0.8rem', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{grp.section}</p>
-                                            </div>
-                                        </div>
-                                        
-                                        <div className="lh-metrics flex gap-1 align-center">
-                                            <div className="metric-pill" style={{ color: 'var(--secondary)', background: 'rgba(219,39,119,0.06)', marginRight: '0.5rem', fontWeight: '700' }}>
-                                                {teacherSubjects.find(s => s._id === (grp.records[0]?.subject?._id || grp.records[0]?.subject))?.name || teacherSubjects.find(s => s._id === selectedSubjectId)?.name || user.subject}
-                                            </div>
-                                            <div className="metric-pill" style={{ color: 'var(--success)', background: 'var(--success-bg)' }}>{grp.present} P</div>
-                                            <div className="metric-pill" style={{ color: 'var(--error)', background: 'var(--error-bg)' }}>{grp.absent} A</div>
-                                            <div className="metric-pill" style={{ color: 'var(--text-dim)', background: 'rgba(15, 23, 42, 0.05)' }}>Total: {grp.total}</div>
-                                            <button className="btn-secondary" style={{ padding: '0.5rem 1rem', marginLeft: '1rem', border: 'none', background: 'white', border: '1px solid var(--border)' }}>
-                                                {isActive ? 'Hide Details' : 'View Details'}
-                                            </button>
-                                        </div>
+                            
+                            <div className="action-cluster" style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+                                {selectedSubjectId && (
+                                    <div className="metric-pill" style={{ color: 'var(--primary)', background: 'var(--primary-light)', fontWeight: '700', padding: '0.5rem 1rem' }}>
+                                        {teacherSubjects.find(s => s._id === selectedSubjectId)?.name || 'Subject'}
                                     </div>
-
+                                )}
+                                <div className="filter-wrapper" style={{ position: 'relative' }} ref={logFiltersRef}>
+                                    <button 
+                                        className={`filter-btn ${showFilters ? 'active' : ''}`}
+                                        onClick={() => {
+                                            if (!showFilters) setDraftFilter({...attFilter});
+                                            setShowFilters(!showFilters);
+                                        }}
+                                    >
+                                        <Filter size={18} />
+                                        <span>Options</span>
+                                    </button>
+                                    
                                     <AnimatePresence>
-                                        {isActive && (
-                                            <motion.div initial={{ height: 0 }} animate={{ height: 'auto' }} exit={{ height: 0 }} style={{ overflow: 'hidden' }}>
-                                                <div className="log-details" style={{ padding: '0 1.5rem 1.5rem 1.5rem', borderTop: '1px solid var(--border)', marginTop: '0.5rem', paddingTop: '1.5rem' }}>
-                                                    <table className="light-table">
-                                                        <thead>
-                                                            <tr>
-                                                                <th>Roll Identity</th>
-                                                                <th>Student Name</th>
-                                                                <th>Recorded Status</th>
-                                                            </tr>
-                                                        </thead>
-                                                        <tbody>
-                                                            {grp.records.map((r, i) => (
-                                                                <tr key={i}>
-                                                                    <td className="font-semibold">{r.student?.rollNumber}</td>
-                                                                    <td className="text-main">{r.student?.name}</td>
-                                                                    <td>
-                                                                        <span className={`badge badge-${r.status.toLowerCase()}`}>{r.status}</span>
-                                                                    </td>
-                                                                </tr>
+                                        {showFilters && (
+                                            <motion.div 
+                                                initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                                                animate={{ opacity: 1, y: 0, scale: 1 }}
+                                                exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                                                className="filter-dropdown glass-card"
+                                            >
+                                                <div className="filter-section">
+                                                    <h4>Attendance Filtering</h4>
+                                                    
+                                                    <div className="filter-group">
+                                                        <p className="filter-label">Subject Type</p>
+                                                        <div className="checkbox-grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
+                                                            {['All', 'Theory', 'Lab'].map(type => (
+                                                                <label key={type} className="checkbox-label">
+                                                                    <input 
+                                                                        type="radio" 
+                                                                        name="logSubjectType"
+                                                                        checked={selectedSubjectType === type}
+                                                                        onChange={() => setSelectedSubjectType(type)}
+                                                                    />
+                                                                    <span>{type}</span>
+                                                                </label>
                                                             ))}
-                                                        </tbody>
-                                                    </table>
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="filter-group">
+                                                        <p className="filter-label">Subject Selection</p>
+                                                        <select 
+                                                            className="quick-select-inline"
+                                                            value={draftSubjectId}
+                                                            onChange={(e) => setDraftSubjectId(e.target.value)}
+                                                        >
+                                                            <option value="">-- Choose Subject --</option>
+                                                            {teacherSubjects
+                                                                .filter(s => {
+                                                                    if (selectedSubjectType === 'All') return true;
+                                                                    if (selectedSubjectType === 'Theory') return !s.isLab;
+                                                                    if (selectedSubjectType === 'Lab') return s.isLab;
+                                                                    return true;
+                                                                })
+                                                                .map(ts => (
+                                                                    <option key={ts._id} value={ts._id}>{ts.name} ({ts.code})</option>
+                                                                ))
+                                                            }
+                                                        </select>
+                                                    </div>
+
+                                                    <div className="filter-group">
+                                                        <p className="filter-label">Select Semester(s)</p>
+                                                        <div className="checkbox-grid">
+                                                            {availableSemesters.length === 0 ? (
+                                                                <p style={{ fontSize: '0.8rem', color: 'var(--text-dim)', gridColumn: '1/-1', opacity: 0.7 }}>No semesters found</p>
+                                                            ) : (
+                                                                availableSemesters.map(sem => (
+                                                                    <label key={sem} className="checkbox-label">
+                                                                        <input 
+                                                                            type="checkbox" 
+                                                                            checked={draftFilter.semesters.includes(sem)}
+                                                                            onChange={(e) => {
+                                                                                const updatedSems = e.target.checked 
+                                                                                    ? [...draftFilter.semesters, sem]
+                                                                                    : draftFilter.semesters.filter(s => s !== sem);
+                                                                                setDraftFilter({...draftFilter, semesters: updatedSems});
+                                                                            }}
+                                                                        />
+                                                                        <span>Sem {sem}</span>
+                                                                    </label>
+                                                                ))
+                                                            )}
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="filter-group">
+                                                        <p className="filter-label">Select Department(s)</p>
+                                                        <div className="checkbox-grid">
+                                                            {availableDepartments.length === 0 ? (
+                                                                <p style={{ fontSize: '0.8rem', color: 'var(--text-dim)', gridColumn: '1/-1', opacity: 0.7 }}>No departments found</p>
+                                                            ) : (
+                                                                availableDepartments.map(dept => (
+                                                                    <label key={dept} className="checkbox-label">
+                                                                        <input 
+                                                                            type="checkbox" 
+                                                                            checked={draftFilter.departments.includes(dept)}
+                                                                            onChange={(e) => {
+                                                                                const updatedDepts = e.target.checked 
+                                                                                    ? [...draftFilter.departments, dept]
+                                                                                    : draftFilter.departments.filter(d => d !== dept);
+                                                                                setDraftFilter({...draftFilter, departments: updatedDepts});
+                                                                            }}
+                                                                        />
+                                                                        <span>{dept}</span>
+                                                                    </label>
+                                                                ))
+                                                            )}
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="filter-section mt-1" style={{ borderTop: '1px solid var(--border)', paddingTop: '1rem', marginTop: '1rem', marginBottom: '1rem' }}>
+                                                        <h4 className="flex align-center gap-sm" style={{ fontSize: '0.9rem', color: 'var(--text-main)', marginBottom: '0.75rem' }}>
+                                                            <CalendarIcon size={14} /> Month Filter
+                                                        </h4>
+                                                        <div className="checkbox-grid" style={{ maxHeight: '150px', overflowY: 'auto', paddingRight: '0.5rem' }}>
+                                                            {availableMonths.map(month => (
+                                                                <label key={month} className="checkbox-label">
+                                                                    <input 
+                                                                        type="checkbox" 
+                                                                        checked={selectedMonths.includes(month)}
+                                                                        onChange={(e) => {
+                                                                            if (e.target.checked) setSelectedMonths([...selectedMonths, month]);
+                                                                            else setSelectedMonths(selectedMonths.filter(m => m !== month));
+                                                                        }}
+                                                                    />
+                                                                    <span style={{ fontSize: '0.85rem' }}>{month}</span>
+                                                                </label>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+
+                                                    <button 
+                                                        className="btn-primary" 
+                                                        style={{ width: '100%', padding: '0.85rem', borderRadius: '0.85rem', fontWeight: '800' }}
+                                                        onClick={() => {
+                                                            setSelectedSubjectId(draftSubjectId);
+                                                            setAttFilter({...draftFilter});
+                                                            setShowFilters(false);
+                                                            setMessage({ type: 'success', text: 'Logs filtered successfully' });
+                                                            setTimeout(() => setMessage({ type: '', text: '' }), 4000);
+                                                        }}
+                                                    >
+                                                        Apply Selected Filters
+                                                    </button>
+                                                    
+                                                    <label className="checkbox-label remember-check" style={{ marginTop: '1rem' }}>
+                                                        <input 
+                                                            type="checkbox" 
+                                                            checked={draftFilter.remember}
+                                                            onChange={(e) => setDraftFilter({...draftFilter, remember: e.target.checked})}
+                                                        />
+                                                        <span>Remember my settings</span>
+                                                    </label>
                                                 </div>
                                             </motion.div>
                                         )}
                                     </AnimatePresence>
                                 </div>
-                            );
-                        })}
+                            </div>
+                        </div>
+
+                        {!selectedSubjectId ? (
+                            <div className="flex-center" style={{ padding: '4rem 1rem', flexDirection: 'column', textAlign: 'center', opacity: 0.6 }}>
+                                <Clock size={48} className="text-dim mb-1" />
+                                <h3>Select a subject to view logs</h3>
+                                <p>Historical attendance data will appear once a subject is picked.</p>
+                            </div>
+                        ) : Object.keys(groupedLogs).length === 0 ? (
+                            <div className="flex-center" style={{ padding: '4rem 1rem', flexDirection: 'column', textAlign: 'center', opacity: 0.6 }}>
+                                <Search size={48} className="text-dim mb-1" />
+                                <h3>No logs found</h3>
+                                <p>No records match your current filters or searching criteria.</p>
+                            </div>
+                        ) : (
+                            <div className="logs-stack" style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', marginTop: '1rem' }}>
+                                {Object.entries(groupedLogs).sort((a,b) => new Date(b[0].split('::')[0]) - new Date(a[0].split('::')[0])).map(([key, group]) => (
+                                    <div key={key} className="log-group-card glass-card" style={{ overflow: 'hidden', border: '1px solid rgba(15,23,42,0.06)' }}>
+                                        <div 
+                                            className="log-group-header flex justify-between align-center" 
+                                            style={{ padding: '1.25rem 1.5rem', background: 'rgba(15, 23, 42, 0.01)', borderBottom: activeLogKey === key ? '1px solid var(--border)' : 'none', cursor: 'pointer' }}
+                                            onClick={() => setActiveLogKey(activeLogKey === key ? null : key)}
+                                        >
+                                            <div className="flex align-center gap-1">
+                                                <div style={{ background: 'var(--primary-glow)', color: 'var(--primary)', padding: '0.6rem', borderRadius: '0.75rem' }}>
+                                                    <CalendarIcon size={20} />
+                                                </div>
+                                                <div>
+                                                    <h4 style={{ margin: 0, fontSize: '1.05rem', color: 'var(--text-main)', fontWeight: '700' }}>{group.dateStr}</h4>
+                                                    <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text-dim)', fontWeight: '600' }}>{group.section}</p>
+                                                </div>
+                                            </div>
+                                            <div className="flex align-center gap-1">
+                                                <div className="metrics-cluster flex gap-1">
+                                                    <span className="metric-pill" style={{ color: 'var(--success)', background: 'var(--success-bg)' }}>{group.present} P</span>
+                                                    <span className="metric-pill" style={{ color: 'var(--error)', background: 'var(--error-bg)' }}>{group.absent} A</span>
+                                                </div>
+                                                <ChevronDown size={20} style={{ transform: activeLogKey === key ? 'rotate(180deg)' : 'none', transition: 'transform 0.3s', color: 'var(--text-dim)' }} />
+                                            </div>
+                                        </div>
+                                        
+                                        <AnimatePresence>
+                                            {activeLogKey === key && (
+                                                <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} style={{ overflow: 'hidden' }}>
+                                                    <div style={{ padding: '1rem' }}>
+                                                        <table className="light-table" style={{ fontSize: '0.9rem' }}>
+                                                            <thead>
+                                                                <tr>
+                                                                    <th style={{ padding: '0.75rem' }}>Student Name</th>
+                                                                    <th style={{ padding: '0.75rem' }}>Roll ID</th>
+                                                                    <th style={{ padding: '0.75rem' }}>Status</th>
+                                                                </tr>
+                                                            </thead>
+                                                            <tbody>
+                                                                {group.records.map((log) => (
+                                                                    <tr key={log._id}>
+                                                                        <td style={{ padding: '0.75rem' }} className="font-semibold text-main">{log.student?.name}</td>
+                                                                        <td style={{ padding: '0.75rem' }}><div className="roll-pill" style={{ fontSize: '0.75rem' }}>{log.student?.rollNumber}</div></td>
+                                                                        <td style={{ padding: '0.75rem' }}>
+                                                                            <span className={`badge badge-${log.status.toLowerCase()}`} style={{ fontSize: '0.75rem' }}>{log.status}</span>
+                                                                        </td>
+                                                                    </tr>
+                                                                ))}
+                                                            </tbody>
+                                                        </table>
+                                                    </div>
+                                                </motion.div>
+                                            )}
+                                        </AnimatePresence>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
                     </div>
-                    )}
                 </motion.div>
             )}
+
             {view === 'materials' && (
                 <motion.div key="materials-view" initial={{opacity: 0, x: 20}} animate={{opacity: 1, x: 0}} exit={{opacity: 0, x: -20}}>
                     {selectedMaterialSubject ? (
@@ -1864,133 +1883,128 @@ const TeacherDashboard = () => {
 
             {view === 'updates' && (
                 <motion.div key="updates-view" initial={{opacity: 0, x: 20}} animate={{opacity: 1, x: 0}} exit={{opacity: 0, x: -20}}>
-                    <div className="glass-card" style={{ padding: '2rem', maxWidth: '600px', margin: '0 auto', marginTop: '2rem' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1.5rem', color: 'var(--primary)' }}>
-                            <Bell size={28} />
-                            <h3 style={{ fontSize: '1.25rem', fontWeight: 700, margin: 0, color: 'var(--text-main)' }}>Publish New Notice</h3>
-                        </div>
-                        <form onSubmit={handleNoticeSubmit}>
-                            <div className="form-group" style={{ marginBottom: '1rem' }}>
-                                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600, fontSize: '0.9rem' }}>Notice Category</label>
-                                <select className="input-field" style={{ width: '100%', padding: '0.75rem', border: '1px solid #ddd', borderRadius: '0.5rem', fontSize: '0.95rem', backgroundColor: 'white' }} value={noticeForm.category} onChange={e => setNoticeForm({...noticeForm, category: e.target.value})} required>
-                                    <option value="General">General</option>
-                                    <option value="Examination">Examination</option>
-                                    <option value="Academic">Academic</option>
-                                    <option value="Urgent">Urgent</option>
-                                    <option value="Other">Other</option>
-                                </select>
+                    <div className="updates-layout-grid" style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 500px) 1fr', gap: '2rem', alignItems: 'start', marginTop: '1rem' }}>
+                        <div className="glass-card" style={{ padding: '2rem' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1.5rem', color: 'var(--primary)' }}>
+                                <Bell size={28} />
+                                <h3 style={{ fontSize: '1.25rem', fontWeight: 700, margin: 0, color: 'var(--text-main)' }}>Publish New Notice</h3>
                             </div>
-                            <div className="form-group" style={{ marginBottom: '1rem' }}>
-                                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600, fontSize: '0.9rem' }}>Title</label>
-                                <input type="text" className="input-field" placeholder="e.g. Upcoming Mid-Term Pattern" value={noticeForm.title} onChange={e => setNoticeForm({...noticeForm, title: e.target.value})} required style={{ width: '100%', padding: '0.75rem', border: '1px solid #ddd', borderRadius: '0.5rem', fontSize: '0.95rem' }} />
-                            </div>
-                            <div className="form-group" style={{ marginBottom: '1.5rem' }}>
-                                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600, fontSize: '0.9rem' }}>Message Content</label>
-                                <textarea className="input-field" rows="4" placeholder="Write full details here..." value={noticeForm.message} onChange={e => setNoticeForm({...noticeForm, message: e.target.value})} required style={{ width: '100%', padding: '0.75rem', border: '1px solid #ddd', borderRadius: '0.5rem', fontSize: '0.95rem', resize: 'vertical' }}></textarea>
-                            </div>
+                            <form onSubmit={handleNoticeSubmit}>
+                                <div className="form-group" style={{ marginBottom: '1rem' }}>
+                                    <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600, fontSize: '0.9rem' }}>Notice Category</label>
+                                    <select className="input-field" style={{ width: '100%', padding: '0.75rem', border: '1px solid #ddd', borderRadius: '0.5rem', fontSize: '0.95rem', backgroundColor: 'white' }} value={noticeForm.category} onChange={e => setNoticeForm({...noticeForm, category: e.target.value})} required>
+                                        <option value="General">General</option>
+                                        <option value="Examination">Examination</option>
+                                        <option value="Academic">Academic</option>
+                                        <option value="Urgent">Urgent</option>
+                                        <option value="Other">Other</option>
+                                    </select>
+                                </div>
+                                <div className="form-group" style={{ marginBottom: '1rem' }}>
+                                    <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600, fontSize: '0.9rem' }}>Title</label>
+                                    <input type="text" className="input-field" placeholder="e.g. Upcoming Mid-Term Pattern" value={noticeForm.title} onChange={e => setNoticeForm({...noticeForm, title: e.target.value})} required style={{ width: '100%', padding: '0.75rem', border: '1px solid #ddd', borderRadius: '0.5rem', fontSize: '0.95rem' }} />
+                                </div>
+                                <div className="form-group" style={{ marginBottom: '1.5rem' }}>
+                                    <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600, fontSize: '0.9rem' }}>Message Content</label>
+                                    <textarea className="input-field" rows="4" placeholder="Write full details here..." value={noticeForm.message} onChange={e => setNoticeForm({...noticeForm, message: e.target.value})} required style={{ width: '100%', padding: '0.75rem', border: '1px solid #ddd', borderRadius: '0.5rem', fontSize: '0.95rem', resize: 'vertical' }}></textarea>
+                                </div>
 
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.5rem' }}>
-                                <div className="form-group">
-                                    <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600, fontSize: '0.85rem' }}>Target Department (Optional)</label>
-                                    <select 
-                                        className="input-field" 
-                                        style={{ width: '100%', padding: '0.75rem', border: '1px solid #ddd', borderRadius: '0.5rem', fontSize: '0.9rem', backgroundColor: 'white' }}
-                                        value={noticeForm.department} 
-                                        onChange={e => setNoticeForm({...noticeForm, department: e.target.value})}
-                                    >
-                                        <option value="">-- All Departments (Global) --</option>
-                                        {availableDepartments.map(dept => (
-                                            <option key={dept} value={dept}>{dept}</option>
-                                        ))}
-                                    </select>
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.5rem' }}>
+                                    <div className="form-group">
+                                        <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600, fontSize: '0.85rem' }}>Target Department (Optional)</label>
+                                        <select 
+                                            className="input-field" 
+                                            style={{ width: '100%', padding: '0.75rem', border: '1px solid #ddd', borderRadius: '0.5rem', fontSize: '0.9rem', backgroundColor: 'white' }}
+                                            value={noticeForm.department} 
+                                            onChange={e => setNoticeForm({...noticeForm, department: e.target.value})}
+                                        >
+                                            <option value="">-- All Departments (Global) --</option>
+                                            {availableDepartments.map(dept => (
+                                                <option key={dept} value={dept}>{dept}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                    <div className="form-group">
+                                        <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600, fontSize: '0.85rem' }}>Target Semester (Optional)</label>
+                                        <select 
+                                            className="input-field" 
+                                            style={{ width: '100%', padding: '0.75rem', border: '1px solid #ddd', borderRadius: '0.5rem', fontSize: '0.9rem', backgroundColor: 'white' }}
+                                            value={noticeForm.semester} 
+                                            onChange={e => setNoticeForm({...noticeForm, semester: e.target.value})}
+                                        >
+                                            <option value="">-- All Semesters (Global) --</option>
+                                            {availableSemesters.map(sem => (
+                                                <option key={sem} value={sem}>Semester {sem}</option>
+                                            ))}
+                                        </select>
+                                    </div>
                                 </div>
-                                <div className="form-group">
-                                    <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600, fontSize: '0.85rem' }}>Target Semester (Optional)</label>
-                                    <select 
-                                        className="input-field" 
-                                        style={{ width: '100%', padding: '0.75rem', border: '1px solid #ddd', borderRadius: '0.5rem', fontSize: '0.9rem', backgroundColor: 'white' }}
-                                        value={noticeForm.semester} 
-                                        onChange={e => setNoticeForm({...noticeForm, semester: e.target.value})}
-                                    >
-                                        <option value="">-- All Semesters (Global) --</option>
-                                        {availableSemesters.map(sem => (
-                                            <option key={sem} value={sem}>Semester {sem}</option>
-                                        ))}
-                                    </select>
+                                <button type="submit" className="btn-primary w-100 flex-center" disabled={isSubmitting} style={{ gap: '0.5rem' }}>
+                                    {isSubmitting ? <span className="spinner"></span> : <><Send size={18} /> Broadcast to Students</>}
+                                </button>
+                            </form>
+                        </div>
+
+                        <div className="notices-history-panel">
+                            <div className="glass-card" style={{ padding: '2rem' }}>
+                                <div className="flex justify-between align-center mb-2">
+                                    <h3 style={{ margin: 0, fontSize: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--text-main)' }}>
+                                        <Layers className="text-primary" size={24} /> Recent Broadcaster Logs
+                                    </h3>
+                                    <span className="badge" style={{ background: 'var(--primary-glow)', color: 'var(--primary)', fontWeight: '800', padding: '0.25rem 0.75rem', borderRadius: '2rem', fontSize: '0.75rem' }}>{notices.length} Sent</span>
+                                </div>
+
+                                <div className="notices-scroll-area" style={{ maxHeight: '650px', overflowY: 'auto', paddingRight: '0.5rem' }}>
+                                    {notices.length === 0 ? (
+                                        <div className="flex-center" style={{ padding: '4rem 1rem', flexDirection: 'column', color: 'var(--text-dim)', textAlign: 'center' }}>
+                                            <Bell size={48} className="opacity-20 mb-1" />
+                                            <p>No broadcast history found. Your published updates will appear here.</p>
+                                        </div>
+                                    ) : (
+                                        <div className="notice-stack" style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                                            {notices.map((notice) => (
+                                                <motion.div 
+                                                    key={notice._id} 
+                                                    className="notice-item-card glass-card"
+                                                    style={{ padding: '1.25rem', border: '1px solid rgba(15,23,42,0.05)', position: 'relative' }}
+                                                >
+                                                    <div className="notice-item-header flex justify-between align-start mb-1">
+                                                        <div>
+                                                            <span className={`badge category-badge ${notice.category?.toLowerCase()}`} style={{ fontSize: '0.65rem', marginBottom: '0.5rem', display: 'inline-block', padding: '0.2rem 0.5rem', borderRadius: '0.4rem', fontWeight: 800 }}>{notice.category}</span>
+                                                            <h4 className="font-bold text-main" style={{ fontSize: '1.05rem', margin: 0 }}>{notice.title}</h4>
+                                                        </div>
+                                                        <button 
+                                                            className="icon-btn hover-error" 
+                                                            onClick={() => handleDeleteNotice(notice._id)}
+                                                            style={{ background: 'transparent', border: 'none', color: 'var(--text-dim)', cursor: 'pointer', padding: '0.25rem' }}
+                                                        >
+                                                            <Trash2 size={16} />
+                                                        </button>
+                                                    </div>
+                                                    <p className="notice-item-body" style={{ fontSize: '0.9rem', color: 'var(--text-dim)', marginBottom: '1rem', lineHeight: '1.5' }}>{notice.message}</p>
+                                                    <div className="notice-item-footer flex justify-between align-center" style={{ borderTop: '1px solid rgba(15,23,42,0.03)', paddingTop: '0.75rem', fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-dim)' }}>
+                                                        <div className="flex gap-2">
+                                                            {notice.targetDepartment && <span className="flex align-center gap-xs"><Building size={12}/> {notice.targetDepartment}</span>}
+                                                            {notice.targetSemester && <span className="flex align-center gap-xs"><CalendarIcon size={12}/> Sem {notice.targetSemester}</span>}
+                                                            {!notice.targetDepartment && !notice.targetSemester && <span className="flex align-center gap-xs"><Users size={12}/> Global</span>}
+                                                        </div>
+                                                        <div className="flex align-center gap-xs">
+                                                            <Clock size={12} /> {new Date(notice.createdAt).toLocaleDateString()}
+                                                        </div>
+                                                    </div>
+                                                </motion.div>
+                                            ))}
+                                        </div>
+                                    )}
                                 </div>
                             </div>
-                            <button type="submit" className="btn-primary w-100 flex-center" disabled={isSubmitting} style={{ gap: '0.5rem' }}>
-                                {isSubmitting ? <span className="spinner"></span> : <><Send size={18} /> Broadcast to Students</>}
-                            </button>
-                        </form>
+                        </div>
                     </div>
                 </motion.div>
             )}
             </AnimatePresence>
             
-            {/* Duplicate Attendance Modal - STRICT BLOCK */}
-            <AnimatePresence>
-                {showDuplicateModal && (
-                    <motion.div 
-                        initial={{ opacity: 0 }} 
-                        animate={{ opacity: 1 }} 
-                        exit={{ opacity: 0 }} 
-                        className="modal-overlay flex-center"
-                        style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(15, 23, 42, 0.6)', backdropFilter: 'blur(8px)', zIndex: 10000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}
-                    >
-                        <motion.div 
-                            initial={{ scale: 0.9, y: 20 }} 
-                            animate={{ scale: 1, y: 0 }} 
-                            className="glass-card"
-                            style={{ background: 'white', padding: '2.5rem', borderRadius: '2rem', width: '100%', maxWidth: '450px', textAlign: 'center', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)', position: 'relative', border: '2px solid #f97316' }}
-                            onClick={(e) => e.stopPropagation()}
-                        >
-                            <div className="warning-icon-bg" style={{ width: '80px', height: '80px', background: '#fff7ed', borderRadius: '50%', margin: '0 auto 1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#f97316' }}>
-                                <AlertCircle size={40} />
-                            </div>
-                            <h3 className="text-main font-bold mb-1" style={{ fontSize: '1.5rem' }}>Attendance Locked</h3>
-                            <p className="text-dim mb-3" style={{ fontSize: '1rem', lineHeight: '1.5', fontWeight: '600' }}>
-                                Attendance has already been marked for this lecture. Duplicate records are not allowed. Please select a different lecture to proceed.
-                            </p>
 
-                            <div className="lecture-selection-box" style={{ background: '#f8fafc', padding: '1.25rem', borderRadius: '1rem', marginBottom: '1.5rem', textAlign: 'left', border: '1px solid #e2e8f0' }}>
-                                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: '800', color: '#64748b', textTransform: 'uppercase', marginBottom: '0.5rem' }}>Switch to Different Lec</label>
-                                <select 
-                                    className="input-field" 
-                                    style={{ width: '100%', padding: '0.85rem', borderRadius: '0.75rem', border: '1px solid #cbd5e1', backgroundColor: 'white', fontWeight: '600' }}
-                                    value={draftSubjectId}
-                                    onChange={(e) => setDraftSubjectId(e.target.value)}
-                                >
-                                    <option value="">-- Choose Subject --</option>
-                                    {teacherSubjects.map(ts => (
-                                        <option key={ts._id} value={ts._id}>{ts.name} ({ts.code})</option>
-                                    ))}
-                                </select>
-                            </div>
-
-                            <button 
-                                className="btn-primary" 
-                                style={{ width: '100%', padding: '1rem', borderRadius: '1rem', fontWeight: '800', fontSize: '1rem', background: 'var(--primary)', boxShadow: '0 10px 15px -3px rgba(79, 70, 229, 0.3)' }}
-                                onClick={() => {
-                                    if (!draftSubjectId) {
-                                        toast.error("Please select a subject");
-                                        return;
-                                    }
-                                    setSelectedSubjectId(draftSubjectId);
-                                    setShowDuplicateModal(false);
-                                    toast.success('Lecture switched successfully');
-                                }}
-                            >
-                                Change Lecture
-                            </button>
-                            
-                            <p style={{ marginTop: '1rem', fontSize: '0.8rem', color: '#94a3b8', fontWeight: '500' }}>
-                                To edit existing records, please use the <strong>Daily Logs</strong> tab.
-                            </p>
-                        </motion.div>
-                    </motion.div>
-                )}
-            </AnimatePresence>
             
             {/* Layout Spacer for Dropdown Visibility */}
             <div className="layout-footer-spacer" style={{ height: '350px' }}></div>
@@ -2113,6 +2127,7 @@ const TeacherDashboard = () => {
                 
                 .attendance-container {
                     padding: 1.5rem;
+                    overflow: visible !important;
                 }
                 
                 .table-header {
@@ -2166,15 +2181,17 @@ const TeacherDashboard = () => {
                     position: absolute;
                     top: calc(100% + 12px);
                     right: 0;
-                    width: 320px;
+                    width: 360px;
+                    max-width: calc(100vw - 2rem);
                     padding: 1.5rem;
                     background: white;
                     border-radius: 1.25rem;
                     box-shadow: 0 20px 40px -10px rgba(0,0,0,0.15);
                     border: 1px solid var(--border);
-                    z-index: 100;
-                    max-height: 70vh;
+                    z-index: 2000;
+                    max-height: 75vh;
                     overflow-y: auto;
+                    overscroll-behavior: contain;
                     cursor: default;
                 }
                 
@@ -2199,6 +2216,20 @@ const TeacherDashboard = () => {
                 .quick-input:focus { border-color: var(--primary); box-shadow: 0 0 0 4px rgba(79, 70, 229, 0.1); }
                 
                 .w-100 { width: 100%; padding-top: 0.85rem; padding-bottom: 0.85rem; }
+
+                .quick-select-inline {
+                    width: 100%;
+                    padding: 0.75rem;
+                    border: 1px solid var(--border);
+                    border-radius: 0.75rem;
+                    font-size: 0.95rem;
+                    font-weight: 600;
+                    color: var(--text-main);
+                    background: rgba(15, 23, 42, 0.02);
+                    outline: none;
+                    cursor: pointer;
+                }
+                .quick-select-inline:focus { border-color: var(--primary); }
                 
                 .table-responsive { overflow-x: auto; }
                 
@@ -2418,9 +2449,21 @@ const TeacherDashboard = () => {
                     
                     .action-buttons { gap: 1rem; scale: 1.1; }
                     
-                    /* Modals on Mobile */
                     .modal-content { width: 95%!important; margin: 0 1rem; padding: 1.5rem!important; max-height: 90vh; overflow-y: auto; }
                     .form-row { grid-template-columns: 1fr; gap: 0; }
+
+                    .category-badge.urgent { background: rgba(239, 68, 68, 0.1); color: var(--error); }
+                    .category-badge.academic { background: rgba(79, 70, 229, 0.1); color: var(--primary); }
+                    .category-badge.examination { background: rgba(245, 158, 11, 0.1); color: var(--warning); }
+                    .category-badge.general { background: rgba(15, 23, 42, 0.05); color: var(--text-dim); }
+                    .category-badge.other { background: rgba(15, 23, 42, 0.1); color: var(--text-main); }
+
+                    .notices-scroll-area::-webkit-scrollbar { width: 6px; }
+                    .notices-scroll-area::-webkit-scrollbar-thumb { background: rgba(15, 23, 42, 0.1); border-radius: 10px; }
+
+                    @media (max-width: 1024px) {
+                        .updates-layout-grid { grid-template-columns: 1fr!important; }
+                    }
                 }
             `}} />
         </motion.div>
