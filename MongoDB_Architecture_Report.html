@@ -1,0 +1,590 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>MongoDB Architecture & Database Documentation</title>
+<style>
+    @page {
+        size: A4;
+        margin: 14mm 14mm 16mm 14mm;
+        @bottom-right {
+            content: counter(page);
+        }
+    }
+    body {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        color: #1e293b;
+        line-height: 1.5;
+        font-size: 11pt;
+        margin: 0;
+        padding: 0;
+        background: #fff;
+    }
+    .header {
+        border-bottom: 2px solid #2563eb;
+        padding-bottom: 12px;
+        margin-bottom: 20px;
+    }
+    h1 {
+        font-size: 22pt;
+        color: #0f172a;
+        margin: 0 0 6px 0;
+        font-weight: 700;
+        letter-spacing: -0.5px;
+    }
+    .subtitle {
+        font-size: 11pt;
+        color: #64748b;
+        margin: 0;
+    }
+    .badge {
+        display: inline-block;
+        background: #eff6ff;
+        color: #2563eb;
+        border: 1px solid #bfdbfe;
+        padding: 3px 10px;
+        border-radius: 9999px;
+        font-size: 8.5pt;
+        font-weight: 600;
+        margin-top: 8px;
+    }
+    h2 {
+        font-size: 14pt;
+        color: #1e3a8a;
+        border-bottom: 1.5px solid #e2e8f0;
+        padding-bottom: 5px;
+        margin-top: 24px;
+        margin-bottom: 12px;
+        page-break-after: avoid;
+    }
+    h3 {
+        font-size: 11.5pt;
+        color: #334155;
+        margin-top: 16px;
+        margin-bottom: 8px;
+        page-break-after: avoid;
+    }
+    p {
+        margin: 0 0 10px 0;
+    }
+    table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 10px 0 18px 0;
+        page-break-inside: avoid;
+        font-size: 9.5pt;
+    }
+    th, td {
+        border: 1px solid #cbd5e1;
+        padding: 7px 10px;
+        text-align: left;
+        vertical-align: top;
+    }
+    th {
+        background-color: #f8fafc;
+        color: #0f172a;
+        font-weight: 600;
+    }
+    tr:nth-child(even) td {
+        background-color: #f1f5f9;
+    }
+    code {
+        font-family: "Consolas", "Courier New", monospace;
+        background: #f1f5f9;
+        color: #0f172a;
+        padding: 2px 5px;
+        border-radius: 4px;
+        font-size: 9pt;
+        border: 1px solid #e2e8f0;
+    }
+    pre {
+        background: #0f172a;
+        color: #f8fafc;
+        padding: 12px;
+        border-radius: 6px;
+        font-family: "Consolas", "Courier New", monospace;
+        font-size: 8.5pt;
+        line-height: 1.45;
+        overflow-x: auto;
+        page-break-inside: avoid;
+        margin: 10px 0 15px 0;
+    }
+    pre code {
+        background: transparent;
+        color: inherit;
+        padding: 0;
+        border: none;
+    }
+    .callout {
+        background-color: #f0fdf4;
+        border-left: 4px solid #16a34a;
+        padding: 10px 14px;
+        border-radius: 0 6px 6px 0;
+        margin: 14px 0;
+        page-break-inside: avoid;
+        font-size: 9.5pt;
+    }
+    .callout-title {
+        font-weight: 700;
+        color: #15803d;
+        margin-bottom: 4px;
+    }
+    .callout-warn {
+        background-color: #fffbeb;
+        border-left: 4px solid #f59e0b;
+    }
+    .callout-warn .callout-title {
+        color: #b45309;
+    }
+    .flow-box {
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        padding: 12px;
+        margin: 15px 0;
+        page-break-inside: avoid;
+    }
+    .flow-step {
+        display: flex;
+        align-items: flex-start;
+        margin-bottom: 8px;
+    }
+    .flow-num {
+        background: #2563eb;
+        color: white;
+        border-radius: 50%;
+        width: 20px;
+        height: 20px;
+        text-align: center;
+        line-height: 20px;
+        font-size: 8.5pt;
+        font-weight: bold;
+        margin-right: 10px;
+        flex-shrink: 0;
+    }
+    .flow-text {
+        font-size: 9.5pt;
+    }
+    .page-break {
+        page-break-before: always;
+    }
+</style>
+</head>
+<body>
+
+<div class="header">
+    <h1>MongoDB Database Architecture & Pipeline Guide</h1>
+    <div class="subtitle">Comprehensive Technical Specification for Smart Attendance & Web Application Systems</div>
+    <span class="badge">Backend Specification</span>
+    <span class="badge">MongoDB BSON Types</span>
+    <span class="badge">Authentication Pipeline</span>
+</div>
+
+<h2>1. Overview of MongoDB & BSON Data Types</h2>
+<p>
+    MongoDB is a document-oriented NoSQL database that stores data in flexible, JSON-like documents called <strong>BSON</strong> (Binary JSON). Unlike traditional relational SQL tables with rigid schemas, MongoDB documents allow nested objects, arrays, and native binary types.
+</p>
+
+<table>
+    <thead>
+        <tr>
+            <th style="width: 20%;">BSON / Mongoose Type</th>
+            <th style="width: 25%;">Internal Representation</th>
+            <th>Usage & Application in Backend</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td><code>ObjectId</code></td>
+            <td>12-byte unique BSON binary</td>
+            <td>Primary key (<code>_id</code>) and foreign key references (e.g. <code>student: ObjectId</code> pointing to <code>User</code>).</td>
+        </tr>
+        <tr>
+            <td><code>String</code></td>
+            <td>UTF-8 text string</td>
+            <td>Used for textual attributes such as names, emails, roll numbers, hashed passwords, and categories.</td>
+        </tr>
+        <tr>
+            <td><code>Number</code> / <code>Int32</code> / <code>Double</code></td>
+            <td>64-bit IEEE 754 float / 32-bit int</td>
+            <td>Used for numerical values, roll number bounds, quantities, and statistics.</td>
+        </tr>
+        <tr>
+            <td><code>Date</code></td>
+            <td>64-bit integer (milliseconds since Epoch)</td>
+            <td>Used for event tracking (<code>createdAt</code>, <code>date</code>, expiry timestamps).</td>
+        </tr>
+        <tr>
+            <td><code>Boolean</code></td>
+            <td>1-byte boolean (true / false)</td>
+            <td>Flags such as <code>isLab</code>, active status, or verified flags.</td>
+        </tr>
+        <tr>
+            <td><code>Array</code></td>
+            <td>List of values / sub-documents</td>
+            <td>Grouped sets, such as student lab batches <code>batches: [{ batchName, startRoll, endRoll }]</code>.</td>
+        </tr>
+    </tbody>
+</table>
+
+<div class="page-break"></div>
+
+<h2>2. Smart Attendance System — Database Collections</h2>
+<p>
+    The system database schema consists of <strong>5 core collections</strong> defined in Mongoose. Below is the complete field specification:
+</p>
+
+<h3>2.1 Users Collection (<code>models/User.js</code>)</h3>
+<p>Stores authentication records and demographic details for administrators, teachers, and students.</p>
+<table>
+    <thead>
+        <tr>
+            <th>Field Name</th>
+            <th>Type</th>
+            <th>Constraints / Indexes</th>
+            <th>Description & Purpose</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td><code>_id</code></td>
+            <td><code>ObjectId</code></td>
+            <td>Primary Key (Auto)</td>
+            <td>Unique identifier generated automatically by MongoDB.</td>
+        </tr>
+        <tr>
+            <td><code>name</code></td>
+            <td><code>String</code></td>
+            <td>Required, Trimmed</td>
+            <td>Full legal name of the user.</td>
+        </tr>
+        <tr>
+            <td><code>email</code></td>
+            <td><code>String</code></td>
+            <td>Unique, Sparse, Lowercase</td>
+            <td>Email address used for Teacher and Admin authentication.</td>
+        </tr>
+        <tr>
+            <td><code>password</code></td>
+            <td><code>String</code></td>
+            <td>Required, <code>select: false</code></td>
+            <td>Hashed using <code>bcrypt</code> with 10 salt rounds. Hidden from default queries for security.</td>
+        </tr>
+        <tr>
+            <td><code>role</code></td>
+            <td><code>String</code></td>
+            <td>Enum: <code>['admin', 'teacher', 'student']</code></td>
+            <td>Determines platform permissions and routing. Default is <code>'student'</code>. Indexed for fast lookup.</td>
+        </tr>
+        <tr>
+            <td><code>rollNumber</code></td>
+            <td><code>String</code></td>
+            <td>Unique, Sparse</td>
+            <td>College roll number used by Students for sign-in.</td>
+        </tr>
+        <tr>
+            <td><code>subject</code></td>
+            <td><code>String</code></td>
+            <td>Sparse</td>
+            <td>Primary instructional subject assigned to teachers.</td>
+        </tr>
+        <tr>
+            <td><code>department</code></td>
+            <td><code>String</code></td>
+            <td>Indexed Compound</td>
+            <td>Department code (e.g. <code>CSE</code>, <code>ECE</code>, <code>MECH</code>).</td>
+        </tr>
+        <tr>
+            <td><code>semester</code></td>
+            <td><code>String</code></td>
+            <td>Indexed Compound</td>
+            <td>Current semester term (e.g. <code>4th</code>, <code>6th</code>).</td>
+        </tr>
+        <tr>
+            <td><code>createdAt</code></td>
+            <td><code>Date</code></td>
+            <td>Default: <code>Date.now</code></td>
+            <td>Timestamp when the account profile was provisioned.</td>
+        </tr>
+    </tbody>
+</table>
+
+<h3>2.2 Attendance Collection (<code>models/Attendance.js</code>)</h3>
+<p>Stores individual attendance log records with normalized timestamps and multi-key compound indexes.</p>
+<table>
+    <thead>
+        <tr>
+            <th>Field Name</th>
+            <th>Type</th>
+            <th>Reference</th>
+            <th>Description & Purpose</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td><code>_id</code></td>
+            <td><code>ObjectId</code></td>
+            <td>—</td>
+            <td>Unique attendance record identifier.</td>
+        </tr>
+        <tr>
+            <td><code>student</code></td>
+            <td><code>ObjectId</code></td>
+            <td>Ref: <code>User</code></td>
+            <td>The student whose attendance is recorded.</td>
+        </tr>
+        <tr>
+            <td><code>teacher</code></td>
+            <td><code>ObjectId</code></td>
+            <td>Ref: <code>User</code></td>
+            <td>The instructor who logged the record.</td>
+        </tr>
+        <tr>
+            <td><code>subject</code></td>
+            <td><code>ObjectId</code></td>
+            <td>Ref: <code>Subject</code></td>
+            <td>Associated academic subject.</td>
+        </tr>
+        <tr>
+            <td><code>date</code></td>
+            <td><code>Date</code></td>
+            <td>—</td>
+            <td>Date of lecture normalized to midnight (<code>00:00:00</code>) for consistent date-range queries.</td>
+        </tr>
+        <tr>
+            <td><code>status</code></td>
+            <td><code>String</code></td>
+            <td>—</td>
+            <td>Attendance state: <code>'Present'</code>, <code>'Absent'</code>, or <code>'Late'</code>.</td>
+        </tr>
+        <tr>
+            <td><code>section</code></td>
+            <td><code>String</code></td>
+            <td>—</td>
+            <td>Class section or batch identifier (Default: <code>'Regular Class'</code>).</td>
+        </tr>
+        <tr>
+            <td><code>createdAt</code></td>
+            <td><code>Date</code></td>
+            <td>—</td>
+            <td>Audit timestamp when the entry was written to the database.</td>
+        </tr>
+    </tbody>
+</table>
+
+<div class="page-break"></div>
+
+<h3>2.3 Subject Collection (<code>models/Subject.js</code>)</h3>
+<p>Contains course curricula, faculty assignments, and lab batch divisions.</p>
+<table>
+    <thead>
+        <tr>
+            <th>Field</th>
+            <th>Type</th>
+            <th>Description</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td><code>name</code></td>
+            <td><code>String</code></td>
+            <td>Subject name (e.g. <em>Database Management Systems</em>).</td>
+        </tr>
+        <tr>
+            <td><code>code</code></td>
+            <td><code>String (Unique)</code></td>
+            <td>Unique academic code (e.g. <code>CS401</code>).</td>
+        </tr>
+        <tr>
+            <td><code>teacher</code></td>
+            <td><code>ObjectId (Ref: User)</code></td>
+            <td>Assigned faculty member responsible for the curriculum.</td>
+        </tr>
+        <tr>
+            <td><code>department</code> / <code>semester</code></td>
+            <td><code>String</code></td>
+            <td>Target academic department and semester.</td>
+        </tr>
+        <tr>
+            <td><code>isLab</code></td>
+            <td><code>Boolean</code></td>
+            <td>Indicates whether this course involves laboratory sessions.</td>
+        </tr>
+        <tr>
+            <td><code>batches</code></td>
+            <td><code>Array of Objects</code></td>
+            <td>List of lab subdivisions: <code>{ batchName: String, startRoll: Number, endRoll: Number }</code>.</td>
+        </tr>
+    </tbody>
+</table>
+
+<h3>2.4 Notice Collection (<code>models/Notice.js</code>)</h3>
+<p>Central notice board for announcements and administrative circulars.</p>
+<table>
+    <thead>
+        <tr>
+            <th>Field</th>
+            <th>Type</th>
+            <th>Description</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td><code>title</code></td>
+            <td><code>String</code></td>
+            <td>Notice headline.</td>
+        </tr>
+        <tr>
+            <td><code>message</code></td>
+            <td><code>String</code></td>
+            <td>Detailed notice body.</td>
+        </tr>
+        <tr>
+            <td><code>category</code></td>
+            <td><code>String</code></td>
+            <td>Enum: <code>'General'</code>, <code>'Examination'</code>, <code>'Urgent'</code>, <code>'Academic'</code>, <code>'Other'</code>.</td>
+        </tr>
+        <tr>
+            <td><code>postedBy</code></td>
+            <td><code>ObjectId (Ref: User)</code></td>
+            <td>Author administrator or faculty member.</td>
+        </tr>
+        <tr>
+            <td><code>targetDepartment</code> / <code>targetSemester</code></td>
+            <td><code>String</code></td>
+            <td>Audience filters (empty string indicates broadcast to all students).</td>
+        </tr>
+        <tr>
+            <td><code>createdAt</code> / <code>updatedAt</code></td>
+            <td><code>Date</code></td>
+            <td>Timestamps managed automatically by Mongoose timestamps option.</td>
+        </tr>
+    </tbody>
+</table>
+
+<h3>2.5 Material Collection (<code>models/Material.js</code>)</h3>
+<p>Repository of study resources, lecture slides, and download links.</p>
+<table>
+    <thead>
+        <tr>
+            <th>Field</th>
+            <th>Type</th>
+            <th>Description</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td><code>title</code></td>
+            <td><code>String</code></td>
+            <td>Title or chapter description.</td>
+        </tr>
+        <tr>
+            <td><code>subject</code> / <code>subjectCode</code></td>
+            <td><code>ObjectId</code> / <code>String</code></td>
+            <td>Linked subject entity and quick lookup code.</td>
+        </tr>
+        <tr>
+            <td><code>department</code> / <code>semester</code></td>
+            <td><code>String</code></td>
+            <td>Target curriculum division.</td>
+        </tr>
+        <tr>
+            <td><code>fileUrl</code> / <code>link</code></td>
+            <td><code>String</code></td>
+            <td>File storage endpoint or web URL.</td>
+        </tr>
+        <tr>
+            <td><code>originalFileName</code></td>
+            <td><code>String</code></td>
+            <td>Original name of uploaded document.</td>
+        </tr>
+        <tr>
+            <td><code>uploadedBy</code></td>
+            <td><code>ObjectId (Ref: User)</code></td>
+            <td>Uploader ID for audit control.</td>
+        </tr>
+    </tbody>
+</table>
+
+<div class="page-break"></div>
+
+<h2>3. End-to-End Data Flow Architecture (Login Pipeline)</h2>
+<p>
+    When a user interacts with the application, data travels through multiple network and software layers before reaching MongoDB. Below is the complete step-by-step lifecycle:
+</p>
+
+<div class="flow-box">
+    <div class="flow-step">
+        <div class="flow-num">1</div>
+        <div class="flow-text"><strong>Client Form Submission:</strong> The user selects their role (<code>Student</code>, <code>Teacher</code>, or <code>Admin</code>) and enters credentials. Students enter their <strong>Roll Number</strong> and <strong>Password</strong>; Teachers/Admins enter their <strong>Email</strong> and <strong>Password</strong>.</div>
+    </div>
+    <div class="flow-step">
+        <div class="flow-num">2</div>
+        <div class="flow-text"><strong>HTTPS POST Request:</strong> The browser executes an asynchronous <code>fetch()</code> or <code>axios.post()</code> call sending JSON over TLS to <code>/api/auth/login</code>.</div>
+    </div>
+    <div class="flow-step">
+        <div class="flow-num">3</div>
+        <div class="flow-text"><strong>Express.js Route & Body Parser:</strong> The Node.js server receives the packet, executes <code>express.json()</code> middleware, and populates <code>req.body</code>.</div>
+    </div>
+    <div class="flow-step">
+        <div class="flow-num">4</div>
+        <div class="flow-text"><strong>MongoDB Query Execution:</strong> The controller determines the query criteria and calls <code>User.findOne().select('+password')</code> over the MongoDB native driver connection pool.</div>
+    </div>
+    <div class="flow-step">
+        <div class="flow-num">5</div>
+        <div class="flow-text"><strong>Bcrypt Password Validation:</strong> The server executes <code>bcrypt.compare(enteredPassword, user.password)</code> to cryptographically verify the password against the stored salt hash.</div>
+    </div>
+    <div class="flow-step">
+        <div class="flow-num">6</div>
+        <div class="flow-text"><strong>JWT Issuance:</strong> Upon successful verification, the server signs a JSON Web Token containing <code>{ id, role }</code> with an expiry of 30 days and sends it back in the response body.</div>
+    </div>
+</div>
+
+<div class="callout">
+    <div class="callout-title">Security Architecture: Why Password Hashing is Mandatory</div>
+    Passwords are never stored in plain text. When a user registers or updates their password, a Mongoose pre-save hook automatically executes:
+    <code>const salt = await bcrypt.genSalt(10); this.password = await bcrypt.hash(this.password, salt);</code>
+    Even if the database is exposed, the actual passwords cannot be reversed.
+</div>
+
+<h3>3.1 Controller Implementation in Your Codebase</h3>
+<pre><code>// Location: backend/controllers/authController.js
+const loginUser = async (req, res) => {
+    try {
+        const { email, rollNumber, password, role } = req.body;
+
+        let user;
+        // Role-based lookup logic
+        if (role === 'student' && rollNumber) {
+            user = await User.findOne({ rollNumber, role }).select('+password');
+        } else if (email) {
+            user = await User.findOne({ email, role }).select('+password');
+        }
+
+        // Cryptographic password comparison
+        if (user && (await user.matchPassword(password))) {
+            res.json({
+                _id: user._id,
+                name: user.name,
+                email: user.email,
+                role: user.role,
+                rollNumber: user.rollNumber,
+                token: generateToken(user._id, user.role)
+            });
+        } else {
+            res.status(401).json({ message: 'Invalid credentials or unauthorized role' });
+        }
+    } catch (error) {
+        res.status(500).json({ message: 'Login failed', error: error.message });
+    }
+};</code></pre>
+
+<div class="callout callout-warn">
+    <div class="callout-title">Database Performance & Indexing Note</div>
+    Your project implements compound indexes on the Attendance collection:
+    <code>attendanceSchema.index({ student: 1, date: -1, subject: 1 });</code>
+    This ensures that when a student views their semester history, MongoDB performs an index scan (IXSCAN) in O(log N) time rather than scanning every document in the collection.
+</div>
+
+</body>
+</html>

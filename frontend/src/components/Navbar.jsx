@@ -275,9 +275,43 @@ const Navbar = () => {
                 
                 @media (max-width: 768px) {
                     .navbar {
-                        margin: 1rem;
-                        flex-direction: column;
-                        gap: 1.5rem;
+                        margin: 0.75rem 1rem;
+                        padding: 0.6rem 1rem;
+                        flex-direction: row;
+                        align-items: center;
+                        justify-content: space-between;
+                        gap: 0.5rem;
+                        border-radius: 1.25rem;
+                    }
+                    /* On mobile, navigation is handled cleanly by the bottom app bar */
+                    .navbar-links {
+                        display: none;
+                    }
+                    .brand-text {
+                        font-size: 1.15rem;
+                    }
+                    .brand-icon-wrapper {
+                        width: 34px;
+                        height: 34px;
+                        border-radius: 0.65rem;
+                    }
+                    .brand-icon-wrapper svg {
+                        width: 18px;
+                        height: 18px;
+                    }
+                    .user-name {
+                        max-width: 90px;
+                        overflow: hidden;
+                        text-overflow: ellipsis;
+                        white-space: nowrap;
+                    }
+                    .logout-btn {
+                        width: 34px;
+                        height: 34px;
+                    }
+                    .logout-btn svg {
+                        width: 16px;
+                        height: 16px;
                     }
                 }
             `}} />

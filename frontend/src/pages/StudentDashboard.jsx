@@ -230,12 +230,12 @@ const StudentDashboard = () => {
                                                     animate={{ opacity: 1, x: 0 }}
                                                     transition={{ delay: index * 0.05 }}
                                                 >
-                                                    <td className="font-semibold text-main">{new Date(record.date).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}</td>
-                                                    <td>
+                                                    <td className="font-semibold text-main" data-label="Date">{new Date(record.date).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}</td>
+                                                    <td data-label="Subject">
                                                         <div className="font-semibold text-main">{record.subject?.name || record.teacher?.subject || 'General Class'}</div>
                                                         <div className="text-muted" style={{fontSize: '0.7rem', fontWeight: 600}}>{record.subject?.code}</div>
                                                     </td>
-                                                    <td>
+                                                    <td data-label="Status">
                                                         <span className={`badge badge-${record.status.toLowerCase()}`}>
                                                             {record.status}
                                                         </span>
@@ -746,6 +746,45 @@ const StudentDashboard = () => {
                 @media (max-width: 640px) {
                     .dashboard-header { flex-direction: column; align-items: flex-start; gap: 1rem; }
                     .header-icon { display: none; }
+                    
+                    /* Convert attendance activity table into modern mobile cards */
+                    .table-responsive { overflow-x: visible; }
+                    .light-table, .light-table thead, .light-table tbody, .light-table th, .light-table td, .light-table tr {
+                        display: block;
+                    }
+                    .light-table thead { display: none; }
+                    .light-table tr {
+                        background: white;
+                        border: 1px solid var(--border);
+                        border-radius: 1.25rem;
+                        margin-bottom: 1rem;
+                        padding: 1rem 1.25rem;
+                        box-shadow: var(--shadow-sm);
+                    }
+                    .light-table td {
+                        display: flex;
+                        justify-content: space-between;
+                        align-items: center;
+                        padding: 0.6rem 0 !important;
+                        border-bottom: 1px dashed rgba(15,23,42,0.06) !important;
+                        text-align: right;
+                    }
+                    .light-table td:last-child {
+                        border-bottom: none !important;
+                    }
+                    .light-table td::before {
+                        content: attr(data-label);
+                        font-weight: 700;
+                        font-size: 0.75rem;
+                        color: var(--text-dim);
+                        text-transform: uppercase;
+                        text-align: left;
+                    }
+                    .light-table td.empty-state {
+                        display: block;
+                        text-align: center;
+                        border: none !important;
+                    }
                 }
             `}} />
         </motion.div>
